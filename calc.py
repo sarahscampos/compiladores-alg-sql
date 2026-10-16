@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from sly import Lexer, Parser
 
+
 class CalcLexer(Lexer):
     # Conjunto de tokens que o analisador léxico vai identificar
     tokens = { NUMBER, PLUS, MINUS, TIMES, DIVIDE, LPAREN, RPAREN }
