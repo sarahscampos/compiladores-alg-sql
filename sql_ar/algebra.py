@@ -154,24 +154,33 @@ def _rotulo_binario(expressao):
     return '×'
 
 
+def decompor(expressao):
+    """Separa um nó em (símbolo do operador, detalhe, filhos).
+
+    É a visão de "árvore de consulta" usada pela árvore em texto e pelo grafo.
+    Relações são as folhas: não têm símbolo, só o nome.
+    """
+    if isinstance(expressao, Relacao):
+        return '', expressao.nome, []
+    if isinstance(expressao, Renomeacao):
+        return 'ρ', expressao.novo_nome, [expressao.expressao]
+    if isinstance(expressao, Selecao):
+        return 'σ', formatar_condicao(expressao.condicao), [expressao.expressao]
+    if isinstance(expressao, Projecao):
+        atributos = ', '.join(map(str, expressao.atributos))
+        return 'π', atributos, [expressao.expressao]
+    if isinstance(expressao, Juncao):
+        return ('⋈', formatar_condicao(expressao.condicao),
+                [expressao.esquerda, expressao.direita])
+    if isinstance(expressao, ProdutoCartesiano):
+        return '×', '', [expressao.esquerda, expressao.direita]
+    raise TypeError(f'expressão desconhecida: {expressao!r}')
+
+
 def formatar_arvore(expressao, prefixo='', ultimo=True, raiz=True) -> str:
     """Árvore de operadores (útil para visualizar a ordem de avaliação)."""
-    if isinstance(expressao, Relacao):
-        rotulo, filhos = expressao.nome, []
-    elif isinstance(expressao, Renomeacao):
-        rotulo, filhos = f'ρ {expressao.novo_nome}', [expressao.expressao]
-    elif isinstance(expressao, Selecao):
-        rotulo, filhos = f'σ {formatar_condicao(expressao.condicao)}', [expressao.expressao]
-    elif isinstance(expressao, Projecao):
-        rotulo = 'π ' + ', '.join(map(str, expressao.atributos))
-        filhos = [expressao.expressao]
-    elif isinstance(expressao, Juncao):
-        rotulo = f'⋈ {formatar_condicao(expressao.condicao)}'
-        filhos = [expressao.esquerda, expressao.direita]
-    elif isinstance(expressao, ProdutoCartesiano):
-        rotulo, filhos = '×', [expressao.esquerda, expressao.direita]
-    else:
-        raise TypeError(f'expressão desconhecida: {expressao!r}')
+    simbolo, detalhe, filhos = decompor(expressao)
+    rotulo = ' '.join(parte for parte in (simbolo, detalhe) if parte)
 
     if raiz:
         linhas = [rotulo]

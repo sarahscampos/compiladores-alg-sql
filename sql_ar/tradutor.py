@@ -2,7 +2,7 @@
 """Fachada que encadeia as fases: léxica -> sintática -> semântica -> tradução."""
 from dataclasses import dataclass
 
-from . import algebra, semantica
+from . import algebra, grafo, otimizador, semantica
 from .ast_sql import Consulta
 from .derivacao import (arvore_sintatica, formatar_arvore_sintatica,
                         formatar_derivacao)
@@ -21,8 +21,22 @@ class ResultadoTraducao:
     def texto(self):
         return algebra.formatar(self.expressao)
 
-    def arvore_algebra(self):
-        return algebra.formatar_arvore(self.expressao)
+    @property
+    def expressao_otimizada(self):
+        return otimizador.otimizar(self.expressao)
+
+    @property
+    def texto_otimizado(self):
+        return algebra.formatar(self.expressao_otimizada)
+
+    def arvore_algebra(self, otimizada=False):
+        expressao = self.expressao_otimizada if otimizada else self.expressao
+        return algebra.formatar_arvore(expressao)
+
+    def salvar_grafo(self, caminho, otimizada=False):
+        """Salva a árvore de consulta como um grafo em SVG."""
+        expressao = self.expressao_otimizada if otimizada else self.expressao
+        grafo.salvar_svg(expressao, caminho)
 
     def derivacao(self):
         return formatar_derivacao(self.reducoes)

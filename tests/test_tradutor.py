@@ -3,11 +3,18 @@
 
 Executar a partir da raiz do projeto:  python -m unittest -v
 """
+import contextlib
+import io
+import os
+import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
+from main import caminho_numerado, main
 from sql_ar import (ErroLexico, ErroSemantico, ErroSintatico, listar_tokens,
                     traduzir)
 from sql_ar.ast_sql import Coluna, E, Ou
+from sql_ar.grafo import construir_grafo, gerar_svg, percorrer
 
 
 def ar(sql):
@@ -206,6 +213,82 @@ class TestesSemanticos(unittest.TestCase):
     def test_coluna_qualificada_na_ast(self):
         coluna = traduzir('SELECT alunos.nome FROM alunos').consulta.colunas[0]
         self.assertEqual(coluna, Coluna('nome', tabela='alunos'))
+
+
+class TestesGrafo(unittest.TestCase):
+    SVG = '{http://www.w3.org/2000/svg}'
+    COM_JOIN = ('SELECT a.nome, m.nota FROM alunos a JOIN matriculas m '
+                'ON a.id = m.aluno_id, cursos WHERE m.nota > 7')
+
+    def test_estrutura_do_grafo(self):
+        raiz = construir_grafo(traduzir('SELECT nome FROM alunos WHERE idade > 1').expressao)
+        self.assertEqual([no.simbolo for no in percorrer(raiz)], ['π', 'σ', ''])
+        self.assertEqual(raiz.filhos[0].filhos[0].linhas, ['alunos'])
+
+    def test_svg_tem_um_no_por_operador_e_n_menos_1_arestas(self):
+        svg = ET.fromstring(gerar_svg(traduzir(self.COM_JOIN).expressao))
+        # π, σ, ×, ⋈, ρ, alunos, ρ, matriculas, cursos
+        self.assertEqual(len(svg.findall(f'{self.SVG}g')), 9)
+        self.assertEqual(len(svg.findall(f'{self.SVG}line')), 8)
+
+    def test_caracteres_especiais_sao_escapados(self):
+        svg = gerar_svg(traduzir("SELECT x FROM t WHERE a < 1 AND b = 'R&D <x>'").expressao)
+        textos = ' '.join(ET.fromstring(svg).itertext())
+        self.assertIn('a < 1', textos)
+        self.assertIn('R&D', textos)
+
+    def test_filhos_abaixo_do_pai_e_sem_sobreposicao(self):
+        raiz = construir_grafo(traduzir(self.COM_JOIN).expressao)
+        nos = list(percorrer(raiz))
+        for no in nos:
+            for filho in no.filhos:
+                self.assertGreater(filho.y, no.y + no.altura)
+        for i, a in enumerate(nos):
+            for b in nos[i + 1:]:
+                sobrepoe_x = abs(a.x - b.x) < (a.largura + b.largura) / 2
+                sobrepoe_y = a.y < b.y + b.altura and b.y < a.y + a.altura
+                self.assertFalse(sobrepoe_x and sobrepoe_y, (a.linhas, b.linhas))
+
+    def test_texto_longo_quebra_em_linhas(self):
+        raiz = construir_grafo(traduzir(
+            "SELECT x FROM t WHERE tabela_longa = 'um texto bem comprido aqui'").expressao)
+        selecao = raiz.filhos[0]
+        self.assertGreater(len(selecao.linhas), 1)
+        self.assertTrue(all(len(linha) <= 30 for linha in selecao.linhas))
+
+    def test_salvar_grafo(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, 'arvore.svg')
+            traduzir('SELECT nome FROM alunos').salvar_grafo(caminho)
+            self.assertEqual(ET.parse(caminho).getroot().tag, f'{self.SVG}svg')
+
+    def test_caminho_numerado(self):
+        self.assertEqual(caminho_numerado('saida/arvore.svg', 2), 'saida/arvore_2.svg')
+
+
+class TestesArquivo(unittest.TestCase):
+
+    def executar(self, conteudo, codificacao):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = os.path.join(pasta, 'consultas.sql')
+            with open(caminho, 'w', encoding=codificacao) as arquivo:
+                arquivo.write(conteudo)
+            saida = io.StringIO()
+            with contextlib.redirect_stdout(saida):
+                codigo = main(['-f', caminho])
+        return codigo, saida.getvalue()
+
+    def test_varias_consultas(self):
+        codigo, saida = self.executar('SELECT a\nFROM t;\n\nSELECT b FROM t;\n', 'utf-8')
+        self.assertEqual(codigo, 0)
+        self.assertIn('π_{a}(t)', saida)
+        self.assertIn('π_{b}(t)', saida)
+
+    def test_arquivo_com_bom(self):
+        # Formato gravado pelo Out-File -Encoding utf8 do Windows PowerShell
+        codigo, saida = self.executar("SELECT a FROM t WHERE c = 'Física';\n", 'utf-8-sig')
+        self.assertEqual(codigo, 0)
+        self.assertIn("π_{a}(σ_{c = 'Física'}(t))", saida)
 
 
 if __name__ == '__main__':

@@ -334,8 +334,9 @@ que só existe se o usuário escreveu parênteses (ex.: `a OR (b OR c)`),
 também os mantém. Na álgebra, `×` é associativo e é escrito sem parênteses.
 Junções encadeadas são parentizadas: `(a ⋈ b) ⋈ c`.
 
-A tradução **não** transforma `σ_{R.a = S.b}(R × S)` em `R ⋈ S`. A saída
-reflete a consulta como foi escrita. Essa otimização está listada na seção 7.
+Por padrão, a tradução **não** transforma `σ_{R.a = S.b}(R × S)` em `R ⋈ S`: a
+saída reflete a consulta como foi escrita. A opção `--otimizar` mostra também a
+versão otimizada (seção 6.6).
 
 ---
 
@@ -350,11 +351,14 @@ O código está completo e é executável. Fica no pacote `sql_ar/`:
 | [sql_ar/ast_sql.py](sql_ar/ast_sql.py) | nós da AST SQL |
 | [sql_ar/semantica.py](sql_ar/semantica.py) | análise semântica (escopo de tabelas e apelidos) |
 | [sql_ar/algebra.py](sql_ar/algebra.py) | nós da Álgebra Relacional, tradução e formatação (linear e em árvore) |
+| [sql_ar/otimizador.py](sql_ar/otimizador.py) | otimização algébrica: seleções e projeções descem na árvore |
+| [sql_ar/grafo.py](sql_ar/grafo.py) | árvore de consulta como grafo em SVG, só com a biblioteca padrão |
 | [sql_ar/derivacao.py](sql_ar/derivacao.py) | derivação mais à direita e árvore sintática a partir das reduções |
 | [sql_ar/erros.py](sql_ar/erros.py) | `ErroLexico`, `ErroSintatico`, `ErroSemantico` com linha, coluna e destaque `^` |
 | [sql_ar/tradutor.py](sql_ar/tradutor.py) | `traduzir(sql)`: encadeia as fases |
 | [main.py](main.py) | interface de linha de comando e modo interativo |
-| [tests/test_tradutor.py](tests/test_tradutor.py) | 36 testes `unittest` |
+| [tests/test_tradutor.py](tests/test_tradutor.py) | testes `unittest` do tradutor e do grafo |
+| [tests/test_otimizador.py](tests/test_otimizador.py) | testes do otimizador, incluindo a equivalência entre as árvores |
 
 Uso como biblioteca:
 
@@ -396,24 +400,82 @@ except ErroTraducao as e:
 
 ## 5. Instalação e execução
 
-Requisitos: Python 3.8 ou superior (testado com Python 3.15.0 e SLY 0.5).
+Testado com Python 3.14.7 e 3.15.0 e SLY 0.5, no Windows. Outras versões não foram testadas.
+
+### 5.1 Instalação
+
+Abra o terminal na **pasta do projeto** (a que contém `main.py`). Todos os comandos
+desta seção partem dela.
+
+Crie um ambiente virtual (opcional, mas evita misturar dependências):
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
 ```
 
-Modo interativo (consultas em uma ou várias linhas, terminadas por `;` ou
-linha vazia; comandos `:tokens`, `:arvore`, `:derivacao`, `:exemplos`, `:sair`):
+Ative o ambiente no PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Ou, no Git Bash:
 
 ```bash
-python main.py
+source .venv/Scripts/activate
 ```
 
-Traduzir uma consulta direto:
+Instale a dependência:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Se o terminal não reconhecer `python`, use `py` no lugar. Se o PowerShell bloquear a
+ativação, rode antes `Set-ExecutionPolicy -Scope Process RemoteSigned`, que vale só
+para aquela janela.
+
+Para conferir, rode os testes. A última linha deve ser `OK`:
+
+```bash
+python -m unittest
+```
+
+### 5.2 Traduzir uma consulta
 
 ```bash
 python main.py "SELECT nome, idade FROM alunos WHERE idade >= 18;"
 ```
+
+Saída:
+
+```
+SQL: SELECT nome, idade FROM alunos WHERE idade >= 18;
+AR:  π_{nome, idade}(σ_{idade >= 18}(alunos))
+```
+
+**Coloque a consulta entre aspas duplas.** Sem elas, o terminal divide a consulta em
+vários argumentos. Os textos do SQL continuam com aspas simples:
+
+```bash
+python main.py "SELECT nome FROM alunos WHERE curso = 'Física';"
+```
+
+### 5.3 Opções
+
+As opções podem vir antes ou depois da consulta e podem ser combinadas.
+`python main.py --help` mostra esta mesma lista.
+
+| Opção | O que faz |
+|---|---|
+| `-f ARQUIVO`, `--arquivo ARQUIVO` | lê as consultas de um arquivo (seção 5.5) |
+| `--exemplos` | roda as consultas de exemplo. A última é inválida de propósito, para mostrar a mensagem de erro |
+| `--tokens` | mostra os tokens reconhecidos pelo lexer |
+| `--arvore` | mostra a árvore relacional e a árvore sintática como texto |
+| `--derivacao` | mostra a derivação mais à direita |
+| `--otimizar` | mostra também a expressão otimizada (seção 6.6) |
+| `--grafo ARQUIVO.svg` | salva a árvore de consulta como grafo |
+| `--abrir` | abre o grafo no navegador. Sem `--grafo`, salva em `arvore_consulta.svg` |
 
 Mostrar a derivação e as árvores:
 
@@ -421,17 +483,85 @@ Mostrar a derivação e as árvores:
 python main.py --derivacao --arvore "SELECT nome, idade, curso FROM alunos;"
 ```
 
-Executar os exemplos e os testes:
+Gerar o grafo e abrir no navegador (seção 6.5):
+
+```bash
+python main.py "SELECT nome FROM alunos WHERE idade >= 18;" --grafo arvore.svg --abrir
+```
+
+Comparar as árvores canônica e otimizada. Este comando salva dois arquivos,
+`arvore.svg` e `arvore_otimizada.svg`:
+
+```bash
+python main.py "SELECT a.nome FROM alunos a, matriculas m WHERE a.id = m.aluno_id AND m.nota > 7;" --otimizar --grafo arvore.svg
+```
+
+Os grafos são salvos na pasta atual, e um arquivo com o mesmo nome é substituído.
+Os arquivos `arvore*.svg` da raiz do projeto são ignorados pelo Git.
+
+### 5.4 Modo interativo
+
+```bash
+python main.py
+```
+
+A consulta pode ocupar várias linhas e termina com `;` ou com uma linha vazia. Os comandos
+começam com `:` e, com exceção de `:exemplos` e `:sair`, ligam ou desligam uma opção,
+que continua valendo para as consultas seguintes.
+
+| Comando | O que faz |
+|---|---|
+| `:tokens`, `:arvore`, `:derivacao`, `:otimizar` | ligam ou desligam a opção de mesmo nome |
+| `:grafo` | liga ou desliga o grafo, salvo sempre em `arvore_consulta.svg` |
+| `:exemplos` | roda as consultas de exemplo |
+| `:sair` | encerra (`Ctrl+C` também) |
+
+Exemplo de sessão:
+
+```
+sql> :otimizar
+otimizar: ligado
+sql> SELECT a.nome
+...> FROM alunos a, matriculas m
+...> WHERE a.id = m.aluno_id;
+
+SQL: SELECT a.nome FROM alunos a, matriculas m WHERE a.id = m.aluno_id;
+AR:  π_{a.nome}(σ_{a.id = m.aluno_id}(ρ_{a}(alunos) × ρ_{m}(matriculas)))
+AR otimizada: π_{a.nome}(π_{a.nome, a.id}(ρ_{a}(alunos)) ⋈_{a.id = m.aluno_id} π_{m.aluno_id}(ρ_{m}(matriculas)))
+sql> :sair
+```
+
+### 5.5 Consultas em arquivo
+
+```bash
+python main.py -f consultas.sql
+```
+
+O arquivo deve estar em UTF-8, e cada consulta deve **terminar em `;` no fim de uma linha**:
+
+```sql
+SELECT nome
+FROM alunos;
+
+SELECT idade FROM alunos WHERE idade > 1;
+```
+
+Duas consultas na mesma linha são lidas como uma só e geram erro de sintaxe.
+Com `--grafo`, cada consulta gera um arquivo numerado: `arvore_1.svg`, `arvore_2.svg` etc.
+
+### 5.6 Exemplos e testes
+
+Rodar as consultas de exemplo (a última termina em erro de propósito):
 
 ```bash
 python main.py --exemplos
 ```
 
+Rodar os testes mostrando cada um. Execute este comando a partir da pasta do projeto:
+
 ```bash
 python -m unittest -v
 ```
-
-Também é possível ler consultas de um arquivo: `python main.py -f consultas.sql`.
 
 ---
 
@@ -440,7 +570,7 @@ Também é possível ler consultas de um arquivo: `python main.py -f consultas.s
 As saídas abaixo foram **obtidas executando o programa** (`python main.py
 --exemplos`) e os oito casos estão automatizados em
 [tests/test_tradutor.py](tests/test_tradutor.py) (classe `TestesObrigatorios`).
-Resultado: `Ran 36 tests … OK`.
+Resultado: `Ran 59 tests … OK`.
 
 ### 6.1 Testes obrigatórios
 
@@ -611,6 +741,72 @@ qualquer número de colunas e mantém a ordem.
 Esses casos são verificados em `TestesPrecedencia`, que inspeciona a AST, e não
 só o texto final.
 
+### 6.5 Árvore de consulta como grafo
+
+A opção `--grafo ARQUIVO.svg` desenha a expressão relacional como um grafo: a
+raiz é o último operador avaliado e as folhas são as relações. O arquivo abre
+em qualquer navegador e não exige instalar o Graphviz. Com várias consultas
+(`-f` ou `--exemplos`), cada grafo vai para um arquivo numerado, como `arvore_1.svg`.
+No modo interativo, `:grafo` salva cada consulta em `arvore_consulta.svg`.
+
+```bash
+python main.py "SELECT Empregado.Sobrenome FROM Projeto, Trabalha, Empregado WHERE Projeto.NomeProj = 'Aquarius' AND Projeto.ProjNum = Trabalha.ProjNum AND Trabalha.NumEmp = Empregado.NumEmp AND Empregado.DataNasc = '10/12/90';" --otimizar --grafo docs/arvore_exemplo.svg
+```
+
+![Árvore de consulta canônica](docs/arvore_exemplo.svg)
+
+Esse grafo mostra a tradução canônica: uma seleção só, acima de todos os
+produtos. A versão otimizada está na próxima seção.
+
+### 6.6 Otimização da árvore de consulta
+
+A opção `--otimizar` aplica à árvore relacional as heurísticas clássicas
+([sql_ar/otimizador.py](sql_ar/otimizador.py)), para descartar linhas e colunas
+o mais cedo possível:
+
+1. **Cascata de seleções:** `σ_{c₁ ∧ c₂}(R)` equivale a `σ_{c₁}(σ_{c₂}(R))`, então
+   cada conjunção é tratada separadamente.
+2. **Seleções descem:** cada condição vai para a subárvore mais baixa que contém
+   todas as tabelas citadas. Condições da mesma tabela voltam a formar um único `σ`.
+3. **`×` vira `⋈`:** a condição que liga os dois lados de um produto cartesiano
+   passa a ser a condição da junção.
+4. **Projeções descem:** cada subárvore produz só as colunas usadas acima dela,
+   inclusive as necessárias para as junções.
+
+Para a consulta da seção 6.5:
+
+![Árvore de consulta otimizada](docs/arvore_exemplo_otimizada.svg)
+
+```
+π_{Empregado.Sobrenome}(
+  π_{Trabalha.NumEmp}(
+    π_{Projeto.ProjNum}(σ_{Projeto.NomeProj = 'Aquarius'}(Projeto))
+      ⋈_{Projeto.ProjNum = Trabalha.ProjNum}
+    π_{Trabalha.NumEmp, Trabalha.ProjNum}(Trabalha))
+  ⋈_{Trabalha.NumEmp = Empregado.NumEmp}
+  π_{Empregado.Sobrenome, Empregado.NumEmp}(σ_{Empregado.DataNasc = '10/12/90'}(Empregado)))
+```
+
+**Limites impostos pela falta de esquema.** Sem o esquema do banco, o programa não
+sabe de qual tabela vem uma coluna sem qualificador. Por segurança:
+
+| Situação | Comportamento | Exemplo |
+|---|---|---|
+| Condição com coluna não qualificada | não desce | `SELECT * FROM a, b WHERE x = 1` mantém `σ_{x = 1}(a × b)` |
+| Consulta com várias tabelas e alguma coluna não qualificada | sem projeções intermediárias | `SELECT x FROM a, b WHERE a.id = b.a_id` gera `π_{x}(a ⋈_{a.id = b.a_id} b)` |
+| `SELECT *` | sem projeções, pois todas as colunas são necessárias | `SELECT * FROM a, b WHERE a.id = b.a_id` gera `a ⋈_{a.id = b.a_id} b` |
+| `OR` entre tabelas | não é separado, porque só `∧` permite a cascata | `a.x = 1 OR b.y = 2` fica inteiro na junção |
+| Tabela sem nenhuma coluna usada | sem `π`, mas continua na árvore, pois afeta o resultado | `SELECT a.x FROM a, b` gera `π_{a.x}(π_{a.x}(a) × b)` |
+
+Por isso a consulta acima usa `Empregado.Sobrenome`, qualificado. Quando todas as
+colunas têm tabela, a árvore sai no formato completo.
+
+**Como a equivalência é verificada.** A classe `TestesEquivalencia` executa as duas
+árvores, com um pequeno avaliador de Álgebra Relacional em semântica de conjuntos,
+sobre 40 bancos gerados aleatoriamente (com semente fixa). Cada uma das 26 consultas
+precisa dar o mesmo resultado nas duas formas. Para validar o próprio teste, foram
+inseridos bugs no otimizador, como separar `OR` como se fosse `AND`, e o teste os detectou.
+
 ---
 
 ## 7. Limitações e melhorias possíveis
@@ -634,11 +830,12 @@ só o texto final.
 
 **Melhorias possíveis:**
 
-* Otimizações algébricas sobre a árvore relacional, como converter
-  `σ_{R.a = S.b}(R × S)` em `R ⋈_{R.a = S.b} S`, empurrar seleções para baixo
-  e quebrar `σ_{c₁ ∧ c₂}` em `σ_{c₁}(σ_{c₂}(…))`.
+* Reordenar as junções: o otimizador mantém a ordem do `FROM`, então em
+  `FROM a, b, c WHERE a.x = c.x AND b.y = c.y` o produto `a × b` continua lá,
+  embora outra ordem o evitasse. Fazer isso bem exige estimativas de custo.
 * Receber um esquema (`{tabela: [colunas]}`) para validar colunas e qualificar
-  automaticamente as não qualificadas.
+  automaticamente as não qualificadas. Isso também eliminaria os limites do
+  otimizador descritos na seção 6.6.
 * Ampliar a gramática com `DISTINCT` (π com/sem eliminação de duplicatas),
   `UNION` (∪), `EXCEPT` (−), `GROUP BY` (operador γ) e subconsultas
   (autoincorporação de `consulta` dentro de `fator`).

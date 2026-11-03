@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="374" height="534" viewBox="0 0 374 534">
+<title>π_{Empregado.Sobrenome}(σ_{Projeto.NomeProj = &#x27;Aquarius&#x27; ∧ Projeto.ProjNum = Trabalha.ProjNum ∧ Trabalha.NumEmp = Empregado.NumEmp ∧ Empregado.DataNasc = &#x27;10/12/90&#x27;}(Projeto × Trabalha × Empregado))</title>
+<style>
+    .aresta { stroke: #64748b; stroke-width: 1.5; }
+    .no { stroke-width: 1.5; }
+    text { font-family: Consolas, 'DejaVu Sans Mono', Menlo, monospace; fill: #1e293b; }
+    .simbolo { font-size: 22px; font-weight: bold; }
+    .detalhe { font-size: 14px; }
+    .relacao .no { fill: #f1f5f9; stroke: #475569; }
+    .relacao .detalhe { font-weight: bold; }
+    .projecao .no { fill: #dbeafe; stroke: #2563eb; }
+    .selecao .no { fill: #fef3c7; stroke: #d97706; }
+    .juncao .no { fill: #dcfce7; stroke: #16a34a; }
+    .produto .no { fill: #fee2e2; stroke: #dc2626; }
+    .renomeacao .no { fill: #f3e8ff; stroke: #9333ea; }
+</style>
+<rect width="374" height="534" fill="#ffffff"/>
+<line class="aresta" x1="187.2" y1="64.0" x2="187.2" y2="106.0"/>
+<line class="aresta" x1="187.2" y1="256.0" x2="187.2" y2="298.0"/>
+<line class="aresta" x1="187.2" y1="342.0" x2="122.5" y2="384.0"/>
+<line class="aresta" x1="187.2" y1="342.0" x2="303.7" y2="384.0"/>
+<line class="aresta" x1="122.5" y1="428.0" x2="62.1" y2="470.0"/>
+<line class="aresta" x1="122.5" y1="428.0" x2="178.6" y2="470.0"/>
+<g class="projecao"><rect class="no" x="78.5" y="20.0" width="217.4" height="44.0" rx="8"/><text class="simbolo" x="90.5" y="42.0" text-anchor="start" dominant-baseline="central">π</text><text class="detalhe" x="120.5" y="42.0" dominant-baseline="central" xml:space="preserve">Empregado.Sobrenome</text></g>
+<g class="selecao"><rect class="no" x="35.5" y="106.0" width="303.4" height="150.0" rx="8"/><text class="simbolo" x="47.5" y="181.0" text-anchor="start" dominant-baseline="central">σ</text><text class="detalhe" x="77.5" y="127.0" dominant-baseline="central" xml:space="preserve">Projeto.NomeProj = &#x27;Aquarius&#x27;</text><text class="detalhe" x="77.5" y="145.0" dominant-baseline="central" xml:space="preserve">∧ Projeto.ProjNum =</text><text class="detalhe" x="77.5" y="163.0" dominant-baseline="central" xml:space="preserve">Trabalha.ProjNum ∧</text><text class="detalhe" x="77.5" y="181.0" dominant-baseline="central" xml:space="preserve">Trabalha.NumEmp =</text><text class="detalhe" x="77.5" y="199.0" dominant-baseline="central" xml:space="preserve">Empregado.NumEmp ∧</text><text class="detalhe" x="77.5" y="217.0" dominant-baseline="central" xml:space="preserve">Empregado.DataNasc =</text><text class="detalhe" x="77.5" y="235.0" dominant-baseline="central" xml:space="preserve">&#x27;10/12/90&#x27;</text></g>
+<g class="produto"><rect class="no" x="160.2" y="298.0" width="54.0" height="44.0" rx="8"/><text class="simbolo" x="187.2" y="320.0" text-anchor="middle" dominant-baseline="central">×</text></g>
+<g class="produto"><rect class="no" x="95.5" y="384.0" width="54.0" height="44.0" rx="8"/><text class="simbolo" x="122.5" y="406.0" text-anchor="middle" dominant-baseline="central">×</text></g>
+<g class="relacao"><rect class="no" x="20.0" y="470.0" width="84.2" height="44.0" rx="8"/><text class="detalhe" x="32.0" y="492.0" dominant-baseline="central" xml:space="preserve">Projeto</text></g>
+<g class="relacao"><rect class="no" x="132.2" y="470.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="144.2" y="492.0" dominant-baseline="central" xml:space="preserve">Trabalha</text></g>
+<g class="relacao"><rect class="no" x="253.0" y="384.0" width="101.4" height="44.0" rx="8"/><text class="detalhe" x="265.0" y="406.0" dominant-baseline="central" xml:space="preserve">Empregado</text></g>
+</svg>
