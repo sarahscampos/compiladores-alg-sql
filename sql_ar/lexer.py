@@ -17,13 +17,15 @@ PALAVRAS_RESERVADAS = {
     'INNER': 'INNER',
     'ON': 'ON',
     'AS': 'AS',
+    'IN': 'IN',
+    'EXISTS': 'EXISTS',
 }
 
 
 class SqlLexer(Lexer):
     # Conjunto de tokens (terminais da gramática)
     tokens = {
-        SELECT, FROM, WHERE, AND, OR, NOT, JOIN, INNER, ON, AS,
+        SELECT, FROM, WHERE, AND, OR, NOT, JOIN, INNER, ON, AS, IN, EXISTS,
         ID, NUMBER, STRING,
         COMMA, DOT, STAR, SEMI, LPAREN, RPAREN,
         EQ, NE, LT, GT, LE, GE,

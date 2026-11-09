@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="309" height="514" viewBox="0 0 309 514">
+<title>π_{nome}(alunos ⋉_{alunos.idade &gt; sub1.idade} ρ_{sub1}(π_{idade}(σ_{id = 1}(alunos))))</title>
+<style>
+    .aresta { stroke: #64748b; stroke-width: 1.5; }
+    .no { stroke-width: 1.5; }
+    text { font-family: Consolas, 'DejaVu Sans Mono', Menlo, monospace; fill: #1e293b; }
+    .simbolo { font-size: 22px; font-weight: bold; }
+    .detalhe { font-size: 14px; }
+    .relacao .no { fill: #f1f5f9; stroke: #475569; }
+    .relacao .detalhe { font-weight: bold; }
+    .projecao .no { fill: #dbeafe; stroke: #2563eb; }
+    .selecao .no { fill: #fef3c7; stroke: #d97706; }
+    .juncao .no { fill: #dcfce7; stroke: #16a34a; }
+    .produto .no { fill: #fee2e2; stroke: #dc2626; }
+    .renomeacao .no { fill: #f3e8ff; stroke: #9333ea; }
+    .semijuncao .no { fill: #ccfbf1; stroke: #0d9488; }
+</style>
+<rect width="309" height="514" fill="#ffffff"/>
+<line class="aresta" x1="154.5" y1="64.0" x2="154.5" y2="106.0"/>
+<line class="aresta" x1="154.5" y1="150.0" x2="87.7" y2="192.0"/>
+<line class="aresta" x1="154.5" y1="150.0" x2="206.3" y2="192.0"/>
+<line class="aresta" x1="206.3" y1="236.0" x2="206.3" y2="278.0"/>
+<line class="aresta" x1="206.3" y1="322.0" x2="206.3" y2="364.0"/>
+<line class="aresta" x1="206.3" y1="408.0" x2="206.3" y2="450.0"/>
+<g class="projecao"><rect class="no" x="110.3" y="20.0" width="88.4" height="44.0" rx="8"/><text class="simbolo" x="122.3" y="42.0" text-anchor="start" dominant-baseline="central">π</text><text class="detalhe" x="152.3" y="42.0" dominant-baseline="central" xml:space="preserve">nome</text></g>
+<g class="semijuncao"><rect class="no" x="20.0" y="106.0" width="269.0" height="44.0" rx="8"/><text class="simbolo" x="32.0" y="128.0" text-anchor="start" dominant-baseline="central">⋉</text><text class="detalhe" x="62.0" y="128.0" dominant-baseline="central" xml:space="preserve">alunos.idade &gt; sub1.idade</text></g>
+<g class="relacao"><rect class="no" x="49.9" y="192.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="61.9" y="214.0" dominant-baseline="central" xml:space="preserve">alunos</text></g>
+<g class="renomeacao"><rect class="no" x="162.1" y="192.0" width="88.4" height="44.0" rx="8"/><text class="simbolo" x="174.1" y="214.0" text-anchor="start" dominant-baseline="central">ρ</text><text class="detalhe" x="204.1" y="214.0" dominant-baseline="central" xml:space="preserve">sub1</text></g>
+<g class="projecao"><rect class="no" x="157.8" y="278.0" width="97.0" height="44.0" rx="8"/><text class="simbolo" x="169.8" y="300.0" text-anchor="start" dominant-baseline="central">π</text><text class="detalhe" x="199.8" y="300.0" dominant-baseline="central" xml:space="preserve">idade</text></g>
+<g class="selecao"><rect class="no" x="153.5" y="364.0" width="105.6" height="44.0" rx="8"/><text class="simbolo" x="165.5" y="386.0" text-anchor="start" dominant-baseline="central">σ</text><text class="detalhe" x="195.5" y="386.0" dominant-baseline="central" xml:space="preserve">id = 1</text></g>
+<g class="relacao"><rect class="no" x="168.5" y="450.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="180.5" y="472.0" dominant-baseline="central" xml:space="preserve">alunos</text></g>
+</svg>

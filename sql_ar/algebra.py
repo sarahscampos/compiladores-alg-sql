@@ -5,15 +5,24 @@ A tradução segue a forma canônica de uma consulta SELECT-FROM-WHERE:
 
     SELECT L FROM R1, ..., Rn WHERE C   ⟶   π_{L}(σ_{C}(R1 × ... × Rn))
 
+Uma condição do WHERE com subconsulta vira uma semijunção (⋉), que mantém
+as linhas da esquerda para as quais existe alguma linha da direita que
+satisfaz a condição:
+
+    SELECT L FROM R WHERE C AND x > (SELECT y FROM S)
+        ⟶   π_{L}(σ_{C}(R ⋉_{R.x > s1.y} ρ_{s1}(π_{y}(S))))
+
 Primeiro a AST SQL é convertida em uma árvore de operadores relacionais;
 só depois essa árvore é transformada em texto, evitando concatenar strings
 durante a análise sintática.
 """
 from dataclasses import dataclass
 from functools import reduce
+from itertools import count
 from typing import Union
 
-from .ast_sql import Comparacao, Consulta, E, Join, Nao, Ou, Tabela
+from .ast_sql import (Coluna, Comparacao, Consulta, E, Em, Join, Nao, Ou,
+                      Subconsulta, Tabela, separar_conjuncoes)
 
 # --- Nós da Álgebra Relacional ---------------------------------------------
 
@@ -54,25 +63,119 @@ class Juncao:              # ⋈ (junção theta)
     condicao: object
 
 
-ExprRelacional = Union[Relacao, Renomeacao, Selecao, Projecao,
-                       ProdutoCartesiano, Juncao]
+@dataclass(frozen=True)
+class Semijuncao:          # ⋉ (semijunção theta): só as colunas da esquerda
+    esquerda: 'ExprRelacional'
+    direita: 'ExprRelacional'
+    condicao: object
 
-BINARIOS = (ProdutoCartesiano, Juncao)
+
+ExprRelacional = Union[Relacao, Renomeacao, Selecao, Projecao,
+                       ProdutoCartesiano, Juncao, Semijuncao]
+
+BINARIOS = (ProdutoCartesiano, Juncao, Semijuncao)
+COM_CONDICAO = (Juncao, Semijuncao)
 
 
 # --- Tradução AST SQL -> Álgebra Relacional ---------------------------------
 
 
 def traduzir(consulta: Consulta) -> ExprRelacional:
+    """Pressupõe uma consulta já validada pela análise semântica."""
+    # Os apelidos das subconsultas (sub1, sub2, ...) não podem coincidir com
+    # nenhum nome de tabela usado em qualquer nível da consulta.
+    return _traduzir_consulta(consulta, _nomes_de_tabelas(consulta), count(1))
+
+
+def _traduzir_consulta(consulta, usados, contador):
     # FROM R1, R2, ..., Rn  ->  ((R1 × R2) × ...) × Rn
     expressao = reduce(ProdutoCartesiano, map(_traduzir_item, consulta.origem))
-    # WHERE C  ->  σ_C(...)
     if consulta.where is not None:
-        expressao = Selecao(consulta.where, expressao)
+        conjuncoes = separar_conjuncoes(consulta.where)
+        if any(_subconsulta_de(c) for c in conjuncoes):
+            comuns = []
+            for condicao in conjuncoes:
+                if _subconsulta_de(condicao):
+                    # x op (SELECT ...)  ->  ... ⋉_{x op sub.y} ρ_{sub}(...)
+                    expressao = _semijuncao(expressao, condicao, consulta, usados, contador)
+                else:
+                    comuns.append(condicao)
+            if comuns:
+                expressao = Selecao(reduce(E, comuns), expressao)
+        else:
+            # WHERE C  ->  σ_C(...), mantendo a condição como foi escrita
+            expressao = Selecao(consulta.where, expressao)
     # SELECT L  ->  π_L(...); SELECT * não gera projeção
     if consulta.colunas is not None:
         expressao = Projecao(consulta.colunas, expressao)
     return expressao
+
+
+def _semijuncao(expressao, condicao, consulta, usados, contador):
+    subconsulta = _subconsulta_de(condicao)
+    apelido = _novo_apelido(usados, contador)
+    interna = _traduzir_consulta(subconsulta.consulta, usados, contador)
+    coluna = Coluna(subconsulta.consulta.colunas[0].nome, tabela=apelido)
+
+    tabela_unica = _tabela_unica(consulta)
+    if isinstance(condicao, Em):
+        # x IN (SELECT y ...)  ->  condição x = sub.y
+        teta = Comparacao(_qualificar(condicao.operando, tabela_unica), '=', coluna)
+    else:
+        lados = [coluna if o is subconsulta else _qualificar(o, tabela_unica)
+                 for o in (condicao.esquerda, condicao.direita)]
+        teta = Comparacao(lados[0], condicao.operador, lados[1])
+    return Semijuncao(expressao, Renomeacao(apelido, interna), teta)
+
+
+def _subconsulta_de(condicao):
+    if isinstance(condicao, Em):
+        return condicao.subconsulta
+    if isinstance(condicao, Comparacao):
+        for operando in (condicao.esquerda, condicao.direita):
+            if isinstance(operando, Subconsulta):
+                return operando
+    return None
+
+
+def _qualificar(operando, tabela):
+    """Na condição da semijunção as colunas dos dois lados se encontram; com
+    uma tabela só no FROM externo, a coluna sem tabela é dela."""
+    if isinstance(operando, Coluna) and operando.tabela is None and tabela:
+        return Coluna(operando.nome, tabela=tabela)
+    return operando
+
+
+def _tabela_unica(consulta):
+    if len(consulta.origem) == 1 and isinstance(consulta.origem[0], Tabela):
+        return consulta.origem[0].nome_visivel
+    return None
+
+
+def _novo_apelido(usados, contador):
+    while True:
+        apelido = f'sub{next(contador)}'
+        if apelido not in usados:
+            usados.add(apelido)
+            return apelido
+
+
+def _nomes_de_tabelas(consulta):
+    nomes = set()
+    pendentes = [consulta]
+    while pendentes:
+        atual = pendentes.pop()
+        itens = list(atual.origem)
+        while itens:
+            item = itens.pop()
+            if isinstance(item, Join):
+                itens += [item.esquerda, item.direita]
+            else:
+                nomes |= {item.nome, item.nome_visivel}
+        for condicao in separar_conjuncoes(atual.where) if atual.where else ():
+            if _subconsulta_de(condicao):
+                pendentes.append(_subconsulta_de(condicao).consulta)
+    return nomes
 
 
 def _traduzir_item(item):
@@ -151,6 +254,8 @@ def formatar(expressao) -> str:
 def _rotulo_binario(expressao):
     if isinstance(expressao, Juncao):
         return f'⋈_{{{formatar_condicao(expressao.condicao)}}}'
+    if isinstance(expressao, Semijuncao):
+        return f'⋉_{{{formatar_condicao(expressao.condicao)}}}'
     return '×'
 
 
@@ -171,6 +276,9 @@ def decompor(expressao):
         return 'π', atributos, [expressao.expressao]
     if isinstance(expressao, Juncao):
         return ('⋈', formatar_condicao(expressao.condicao),
+                [expressao.esquerda, expressao.direita])
+    if isinstance(expressao, Semijuncao):
+        return ('⋉', formatar_condicao(expressao.condicao),
                 [expressao.esquerda, expressao.direita])
     if isinstance(expressao, ProdutoCartesiano):
         return '×', '', [expressao.esquerda, expressao.direita]

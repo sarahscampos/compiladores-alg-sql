@@ -13,17 +13,22 @@ Sem o esquema do banco não se sabe a qual tabela pertence uma coluna não
 qualificada. Por isso a condição que usa uma delas não desce, e uma consulta
 com várias tabelas que use alguma não recebe projeções intermediárias.
 A ordem das tabelas no FROM é mantida: não há reordenação de junções.
+
+Numa semijunção R ⋉ S só as colunas de R continuam acima dela. As regras
+valem para R; a subconsulta S é otimizada separadamente.
 """
+from dataclasses import replace
 from functools import reduce
 
 from .algebra import (BINARIOS, Juncao, ProdutoCartesiano, Projecao, Relacao,
-                      Renomeacao, Selecao)
+                      Renomeacao, Selecao, Semijuncao)
 from .ast_sql import Coluna, Comparacao, E, Nao, Ou
 
 
 def otimizar(expressao):
+    expressao = _otimizar_subconsultas(expressao)
     # Com uma só tabela não há para onde descer: a forma canônica já é a melhor
-    if len(_tabelas_visiveis(expressao)) < 2:
+    if _contar_relacoes(expressao) < 2:
         return expressao
 
     if isinstance(expressao, Projecao):
@@ -47,14 +52,27 @@ def _empurrar_selecoes(corpo):
     condicoes = []
     if isinstance(corpo, Selecao):
         condicoes, corpo = _separar_conjuncoes(corpo.condicao), corpo.expressao
-    # Condições sem dono conhecido ficam no topo, acima de todas as tabelas
+    # Condições sem dono conhecido ficam acima de todas as tabelas
     pendentes = [c for c in condicoes if not _totalmente_qualificada(c)]
     colocaveis = [c for c in condicoes if _totalmente_qualificada(c)]
-    return _aplicar_selecao(_inserir(corpo, colocaveis), pendentes)
+    return _abaixo_das_semijuncoes(_inserir(corpo, colocaveis), pendentes)
+
+
+def _abaixo_das_semijuncoes(expressao, condicoes):
+    """σ_c(R ⋉ S) = σ_c(R) ⋉ S para qualquer c, pois acima da semijunção só
+    existem as colunas de R. Vale até para colunas sem tabela."""
+    if isinstance(expressao, Semijuncao):
+        return replace(expressao,
+                       esquerda=_abaixo_das_semijuncoes(expressao.esquerda, condicoes))
+    return _aplicar_selecao(expressao, condicoes)
 
 
 def _inserir(expressao, condicoes):
     """Coloca cada condição no ponto mais baixo em que ela pode ser avaliada."""
+    if isinstance(expressao, Semijuncao):
+        # Acima de R ⋉ S só há colunas de R: tudo desce para a esquerda,
+        # e a condição da semijunção fica onde está.
+        return replace(expressao, esquerda=_inserir(expressao.esquerda, condicoes))
     if not isinstance(expressao, BINARIOS):
         return _aplicar_selecao(expressao, condicoes)
 
@@ -100,6 +118,11 @@ def _combinar(condicoes):
 
 def _restringir(expressao, necessarias):
     """Faz a subárvore produzir só as colunas `necessarias` (todas dela)."""
+    if isinstance(expressao, Semijuncao):
+        da_condicao = _da_subarvore(_colunas(expressao.condicao), expressao.esquerda)
+        usadas = list(dict.fromkeys(necessarias + da_condicao))
+        nova = replace(expressao, esquerda=_restringir(expressao.esquerda, usadas))
+        return _aplicar_projecao(nova, necessarias) if set(da_condicao) - set(necessarias) else nova
     if not isinstance(expressao, BINARIOS):
         return _aplicar_projecao(expressao, necessarias)
 
@@ -145,6 +168,9 @@ def _projecoes_sao_seguras(atributos, expressao):
 def _colunas_das_condicoes(expressao):
     if isinstance(expressao, Selecao):
         return _colunas(expressao.condicao) + _colunas_das_condicoes(expressao.expressao)
+    if isinstance(expressao, Semijuncao):
+        # As condições internas da subconsulta não dizem respeito a este nível
+        return _colunas(expressao.condicao) + _colunas_das_condicoes(expressao.esquerda)
     if isinstance(expressao, BINARIOS):
         proprias = _colunas(expressao.condicao) if isinstance(expressao, Juncao) else []
         return (proprias + _colunas_das_condicoes(expressao.esquerda)
@@ -152,7 +178,35 @@ def _colunas_das_condicoes(expressao):
     return []
 
 
+# --- Subconsultas ----------------------------------------------------------
+
+
+def _otimizar_subconsultas(expressao):
+    """Otimiza cada subconsulta (lado direito das semijunções) por conta própria."""
+    if isinstance(expressao, Semijuncao):
+        subconsulta = expressao.direita   # ρ_{apelido}(consulta interna)
+        return replace(expressao,
+                       esquerda=_otimizar_subconsultas(expressao.esquerda),
+                       direita=replace(subconsulta, expressao=otimizar(subconsulta.expressao)))
+    if isinstance(expressao, BINARIOS):
+        return replace(expressao,
+                       esquerda=_otimizar_subconsultas(expressao.esquerda),
+                       direita=_otimizar_subconsultas(expressao.direita))
+    if isinstance(expressao, (Selecao, Projecao)):
+        return replace(expressao, expressao=_otimizar_subconsultas(expressao.expressao))
+    return expressao
+
+
 # --- Consultas sobre a árvore ----------------------------------------------
+
+
+def _contar_relacoes(expressao):
+    if isinstance(expressao, Relacao):
+        return 1
+    if isinstance(expressao, BINARIOS):
+        return _contar_relacoes(expressao.esquerda) + _contar_relacoes(expressao.direita)
+    return _contar_relacoes(expressao.expressao)
+
 
 
 def _tabelas_visiveis(expressao):
@@ -161,6 +215,8 @@ def _tabelas_visiveis(expressao):
         return {expressao.nome}
     if isinstance(expressao, Renomeacao):
         return {expressao.novo_nome}
+    if isinstance(expressao, Semijuncao):
+        return _tabelas_visiveis(expressao.esquerda)
     if isinstance(expressao, BINARIOS):
         return _tabelas_visiveis(expressao.esquerda) | _tabelas_visiveis(expressao.direita)
     return _tabelas_visiveis(expressao.expressao)

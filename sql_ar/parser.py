@@ -7,8 +7,8 @@ As produções recursivas estão marcadas com [RECURSIVA] nos comentários.
 """
 from sly import Parser
 
-from .ast_sql import (Coluna, Comparacao, Consulta, E, Join, Nao, Numero, Ou,
-                      Tabela, Texto)
+from .ast_sql import (Coluna, Comparacao, Consulta, E, Em, Existe, Join, Nao,
+                      Numero, Ou, Subconsulta, Tabela, Texto)
 from .erros import ErroSintatico, calcular_coluna
 from .lexer import SqlLexer
 
@@ -80,11 +80,19 @@ class SqlParser(Parser):
         self.reducoes.append((producao.name, lado_direito))
 
     # ------------------------------------------------------------------
-    # consulta → SELECT lista_selecao FROM lista_tabelas clausula_where fim
+    # consulta → selecao fim
+    # selecao  → SELECT lista_selecao FROM lista_tabelas clausula_where
     # ------------------------------------------------------------------
 
-    @_('SELECT lista_selecao FROM lista_tabelas clausula_where fim')
+    @_('selecao fim')
     def consulta(self, p):
+        self._registrar(p)
+        return p.selecao
+
+    # Separada de `consulta` para poder aparecer entre parênteses como
+    # subconsulta, onde não pode haver ';'.
+    @_('SELECT lista_selecao FROM lista_tabelas clausula_where')
+    def selecao(self, p):
         self._registrar(p)
         colunas = None if p.lista_selecao is None else tuple(p.lista_selecao)
         return Consulta(colunas, tuple(p.lista_tabelas), p.clausula_where)
@@ -230,6 +238,13 @@ class SqlParser(Parser):
         self._registrar(p)
         return p.condicao
 
+    # Aceito pela gramática para dar uma mensagem clara; a análise
+    # semântica informa que EXISTS ainda não é traduzido.
+    @_('EXISTS subconsulta')
+    def fator(self, p):
+        self._registrar(p)
+        return Existe(p.subconsulta)
+
     @_('comparacao')
     def fator(self, p):
         self._registrar(p)
@@ -239,6 +254,16 @@ class SqlParser(Parser):
     def comparacao(self, p):
         self._registrar(p)
         return Comparacao(p.operando0, p.op_rel, p.operando1)
+
+    @_('operando IN subconsulta')
+    def comparacao(self, p):
+        self._registrar(p)
+        return Em(p.operando, p.subconsulta)
+
+    @_('operando NOT IN subconsulta')
+    def comparacao(self, p):
+        self._registrar(p)
+        return Em(p.operando, p.subconsulta, negado=True)
 
     @_('EQ', 'NE', 'LT', 'GT', 'LE', 'GE')
     def op_rel(self, p):
@@ -259,6 +284,18 @@ class SqlParser(Parser):
     def operando(self, p):
         self._registrar(p)
         return Texto(p.STRING)
+
+    @_('subconsulta')
+    def operando(self, p):
+        self._registrar(p)
+        return p.subconsulta
+
+    # [AUTOINCORPORAÇÃO] consulta ⇒* ... ( selecao ) ...: uma consulta
+    # inteira aparece dentro de outra, cercada por parênteses.
+    @_('LPAREN selecao RPAREN')
+    def subconsulta(self, p):
+        self._registrar(p)
+        return Subconsulta(p.selecao, linha=p.lineno, indice=p.index)
 
     # ------------------------------------------------------------------
     # Tratamento de erros sintáticos

@@ -27,7 +27,7 @@ MAX_CARACTERES_LINHA = 30
 
 CLASSE_POR_SIMBOLO = {
     '': 'relacao', 'π': 'projecao', 'σ': 'selecao', '⋈': 'juncao',
-    '×': 'produto', 'ρ': 'renomeacao',
+    '×': 'produto', 'ρ': 'renomeacao', '⋉': 'semijuncao',
 }
 
 ESTILO = """
@@ -43,6 +43,7 @@ ESTILO = """
     .juncao .no { fill: #dcfce7; stroke: #16a34a; }
     .produto .no { fill: #fee2e2; stroke: #dc2626; }
     .renomeacao .no { fill: #f3e8ff; stroke: #9333ea; }
+    .semijuncao .no { fill: #ccfbf1; stroke: #0d9488; }
 """
 
 

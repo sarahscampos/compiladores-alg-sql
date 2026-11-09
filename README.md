@@ -47,7 +47,7 @@ Um não terminal `A` é **recursivo** quando `A ⇒⁺ α A β`. Há três casos
 |---|---|---|
 | `A ⇒⁺ A β` | recursão à esquerda | `lista_colunas → lista_colunas , coluna` |
 | `A ⇒⁺ α A` | recursão à direita | `fator → NOT fator` |
-| `A ⇒⁺ α A β`, com α ≠ ε e β ≠ ε | **autoincorporação** (*self-embedding*) em sentido estrito | `condicao ⇒⁺ ( condicao )` |
+| `A ⇒⁺ α A β`, com α ≠ ε e β ≠ ε | **autoincorporação** (*self-embedding*) em sentido estrito | `condicao ⇒⁺ ( condicao )` e `selecao ⇒⁺ … ( selecao )` (subconsulta) |
 
 > **Observação sobre o termo.** Em muitos materiais didáticos, "autoincorporação"
 > é usado para qualquer regra em que o não terminal aparece no próprio lado
@@ -56,8 +56,10 @@ Um não terminal `A` é **recursivo** quando `A ⇒⁺ α A β`. Há três casos
 > dois lados (α e β não vazios). Isso importa porque uma gramática **sem**
 > autoincorporação estrita gera apenas linguagens regulares. Listas separadas por
 > vírgula são regulares (`coluna (, coluna)*`). Parênteses balanceados não são.
-> Nesta gramática, a autoincorporação estrita aparece em
-> `condicao → conjuncao → fator → ( condicao )`.
+> Nesta gramática, a autoincorporação estrita aparece em dois lugares:
+> `condicao → conjuncao → fator → ( condicao )` e nas subconsultas, em que uma
+> consulta inteira aparece dentro de outra:
+> `selecao ⇒⁺ SELECT … WHERE operando op_rel ( selecao )` (seção 6.7).
 > As duas formas de recursão estão no código e são explicadas abaixo.
 
 ### 1.3 A lista de colunas recursiva à esquerda
@@ -148,7 +150,7 @@ Outras produções recursivas: `lista_tabelas` (mesma estrutura),
 
 | Token | Lexema |
 |---|---|
-| `SELECT FROM WHERE AND OR NOT JOIN INNER ON AS` | palavras-chave, sem diferença entre maiúsculas e minúsculas |
+| `SELECT FROM WHERE AND OR NOT JOIN INNER ON AS IN EXISTS` | palavras-chave, sem diferença entre maiúsculas e minúsculas |
 | `ID` | `[A-Za-z_][A-Za-z0-9_]*` (exceto palavras-chave) |
 | `NUMBER` | `\d+(\.\d+)?` |
 | `STRING` | `'…'` (aspas internas escritas como `''`) |
@@ -158,14 +160,16 @@ Outras produções recursivas: `lista_tabelas` (mesma estrutura),
 Ignorados pelo lexer: espaços, tabulações, quebras de linha (contadas para as
 mensagens de erro) e comentários `-- …`.
 
-**Não terminais:** `consulta, fim, clausula_where, lista_selecao, lista_colunas,
+**Não terminais:** `consulta, selecao, fim, clausula_where, lista_selecao, lista_colunas,
 coluna, referencia, lista_tabelas, item_from, tabela, condicao, conjuncao, fator,
-comparacao, op_rel, operando`
+comparacao, op_rel, operando, subconsulta`
 
 **Produções (BNF):**
 
 ```bnf
-consulta       → SELECT lista_selecao FROM lista_tabelas clausula_where fim
+consulta       → selecao fim
+
+selecao        → SELECT lista_selecao FROM lista_tabelas clausula_where
 
 fim            → SEMI
                | ε
@@ -203,30 +207,43 @@ conjuncao      → conjuncao AND fator               (* nível 2: AND *)
 
 fator          → NOT fator                         (* nível 3: NOT, recursiva à direita *)
                | LPAREN condicao RPAREN            (* autoincorporação *)
+               | EXISTS subconsulta                (* reconhecido, mas rejeitado na semântica *)
                | comparacao
 
 comparacao     → operando op_rel operando
+               | operando IN subconsulta
+               | operando NOT IN subconsulta       (* reconhecido, mas rejeitado na semântica *)
 
 op_rel         → EQ | NE | LT | GT | LE | GE
 
 operando       → referencia | NUMBER | STRING
+               | subconsulta
+
+subconsulta    → LPAREN selecao RPAREN             (* autoincorporação *)
 ```
+
+`selecao` existe separada de `consulta` porque a subconsulta não pode ter `;`.
+Após um `(`, o parser decide pelo token seguinte se está agrupando uma condição
+ou abrindo uma subconsulta: `SELECT` só pode iniciar uma `selecao`.
 
 A mesma gramática em EBNF, só como referência (o SLY recebe a forma BNF acima):
 
 ```ebnf
-consulta   = "SELECT" ( "*" | coluna { "," coluna } ) "FROM" item_from { "," item_from }
-             [ "WHERE" condicao ] [ ";" ] ;
+consulta   = selecao [ ";" ] ;
+selecao    = "SELECT" ( "*" | coluna { "," coluna } ) "FROM" item_from { "," item_from }
+             [ "WHERE" condicao ] ;
 item_from  = tabela { [ "INNER" ] "JOIN" tabela "ON" condicao } ;
 tabela     = ID [ [ "AS" ] ID ] ;
 condicao   = conjuncao { "OR" conjuncao } ;
 conjuncao  = fator { "AND" fator } ;
-fator      = "NOT" fator | "(" condicao ")" | operando op_rel operando ;
-operando   = referencia | NUMBER | STRING ;
+fator      = "NOT" fator | "(" condicao ")" | "EXISTS" subconsulta
+           | operando op_rel operando | operando [ "NOT" ] "IN" subconsulta ;
+operando   = referencia | NUMBER | STRING | subconsulta ;
+subconsulta = "(" selecao ")" ;
 referencia = ID [ "." ID ] ;
 ```
 
-O SLY gera para essa gramática uma tabela LALR(1) com **61 estados e nenhum
+O SLY gera para essa gramática uma tabela LALR(1) com **73 estados e nenhum
 conflito** (shift/reduce = 0, reduce/reduce = 0), o que foi verificado por
 `SqlParser._lrtable.sr_conflicts` / `rr_conflicts`. Logo, a gramática não é
 ambígua para o SLY.
@@ -297,7 +314,10 @@ strings de Álgebra Relacional.
 | `fator → NOT fator` | `Nao(fator)` |
 | `fator → ( condicao )` | `condicao` (o agrupamento já está na árvore) |
 | `comparacao → operando op_rel operando` | `Comparacao(esq, op, dir)` |
-| `consulta → …` | `Consulta(colunas, origem, where)` |
+| `comparacao → operando IN subconsulta` | `Em(operando, subconsulta)` |
+| `subconsulta → ( selecao )` | `Subconsulta(consulta)` |
+| `selecao → SELECT …` | `Consulta(colunas, origem, where)` |
+| `consulta → selecao fim` | a própria `Consulta` |
 
 São atributos **sintetizados**: cada valor vem dos filhos, como numa
 gramática S-atribuída, que é o modelo natural de um parser ascendente.
@@ -312,7 +332,7 @@ reconstrói a **derivação mais à direita** (as reduções em ordem inversa) e
 
 [sql_ar/algebra.py](sql_ar/algebra.py) converte a AST numa árvore de operadores
 (`Relacao`, `Renomeacao`, `Selecao`, `Projecao`, `ProdutoCartesiano`,
-`Juncao`) seguindo a forma canônica:
+`Juncao`, `Semijuncao`) seguindo a forma canônica:
 
 ```
 SELECT L FROM R₁, …, Rₙ WHERE C   ⟶   π_{L}( σ_{C}( R₁ × … × Rₙ ) )
@@ -327,6 +347,7 @@ SELECT L FROM R₁, …, Rₙ WHERE C   ⟶   π_{L}( σ_{C}( R₁ × … × R�
 | `SELECT L` | `π_{L}(…)` |
 | `SELECT *` | sem `π` |
 | `AND` / `OR` / `NOT` | `∧` / `∨` / `¬` |
+| `WHERE x op (SELECT y …)` / `WHERE x IN (SELECT y …)` | `R ⋉_{x op sub1.y} ρ_{sub1}(…)` (semijunção, seção 6.7) |
 
 A formatação usa parênteses **mínimos que preservam a estrutura**: um `∨`
 dentro de um `∧` recebe parênteses. Um operador do mesmo nível à direita,
@@ -349,7 +370,7 @@ O código está completo e é executável. Fica no pacote `sql_ar/`:
 | [sql_ar/lexer.py](sql_ar/lexer.py) | `SqlLexer(sly.Lexer)`: tokens, palavras-chave case-insensitive, strings, números, comentários, contagem de linhas e `error()` para caracteres inválidos e strings não fechadas |
 | [sql_ar/parser.py](sql_ar/parser.py) | `SqlParser(sly.Parser)`: todas as produções da seção 2 com ações semânticas e `error()` que lista os tokens esperados |
 | [sql_ar/ast_sql.py](sql_ar/ast_sql.py) | nós da AST SQL |
-| [sql_ar/semantica.py](sql_ar/semantica.py) | análise semântica (escopo de tabelas e apelidos) |
+| [sql_ar/semantica.py](sql_ar/semantica.py) | análise semântica (escopo de tabelas e apelidos, onde as subconsultas podem aparecer) |
 | [sql_ar/algebra.py](sql_ar/algebra.py) | nós da Álgebra Relacional, tradução e formatação (linear e em árvore) |
 | [sql_ar/otimizador.py](sql_ar/otimizador.py) | otimização algébrica: seleções e projeções descem na árvore |
 | [sql_ar/grafo.py](sql_ar/grafo.py) | árvore de consulta como grafo em SVG, só com a biblioteca padrão |
@@ -359,6 +380,7 @@ O código está completo e é executável. Fica no pacote `sql_ar/`:
 | [main.py](main.py) | interface de linha de comando e modo interativo |
 | [tests/test_tradutor.py](tests/test_tradutor.py) | testes `unittest` do tradutor e do grafo |
 | [tests/test_otimizador.py](tests/test_otimizador.py) | testes do otimizador, incluindo a equivalência entre as árvores |
+| [tests/test_subconsultas.py](tests/test_subconsultas.py) | testes das subconsultas, incluindo a comparação com o SQLite |
 
 Uso como biblioteca:
 
@@ -570,7 +592,7 @@ python -m unittest -v
 As saídas abaixo foram **obtidas executando o programa** (`python main.py
 --exemplos`) e os oito casos estão automatizados em
 [tests/test_tradutor.py](tests/test_tradutor.py) (classe `TestesObrigatorios`).
-Resultado: `Ran 59 tests … OK`.
+Resultado: `Ran 88 tests … OK`.
 
 ### 6.1 Testes obrigatórios
 
@@ -807,6 +829,76 @@ sobre 40 bancos gerados aleatoriamente (com semente fixa). Cada uma das 26 consu
 precisa dar o mesmo resultado nas duas formas. Para validar o próprio teste, foram
 inseridos bugs no otimizador, como separar `OR` como se fosse `AND`, e o teste os detectou.
 
+### 6.7 Subconsultas
+
+São aceitas subconsultas **não correlacionadas** em duas formas, como condição do
+`WHERE` ligada às demais por `AND`:
+
+* `operando op_rel (SELECT coluna …)`, comparação com o valor da subconsulta;
+* `operando IN (SELECT coluna …)`.
+
+```bash
+python main.py "SELECT nome FROM alunos WHERE idade > (SELECT idade FROM alunos WHERE id = 1);"
+```
+
+```
+π_{nome}(alunos ⋉_{alunos.idade > sub1.idade} ρ_{sub1}(π_{idade}(σ_{id = 1}(alunos))))
+```
+
+![Árvore de consulta com subconsulta](docs/arvore_subconsulta.svg)
+
+**Por que semijunção (`⋉`).** A Álgebra Relacional não tem subconsulta: a consulta
+interna precisa virar uma relação combinada com a externa. A semijunção
+`R ⋉_{θ} S` devolve as linhas de `R` para as quais existe alguma linha de `S`
+que satisfaz `θ`, e **só com as colunas de `R`**. Por isso ela é a tradução
+usual de `IN`. Comparada com `σ_{θ}(R × S)`:
+
+* uma linha de `R` não se repete quando várias linhas de `S` a satisfazem;
+* `SELECT *` continua devolvendo só as colunas da consulta externa;
+* as colunas de `S` não se misturam com as de `R` acima da semijunção.
+
+**Decisões da tradução:**
+
+| Situação | Decisão |
+|---|---|
+| Nome da subconsulta | `ρ_{sub1}`, `ρ_{sub2}`…, nunca igual a uma tabela usada na consulta. No exemplo, o `ρ` é indispensável, porque `alunos` aparece nos dois níveis |
+| `x IN (SELECT y …)` | condição `x = sub1.y` |
+| Coluna sem tabela na condição θ | com uma tabela só no `FROM` externo, ela é qualificada (`idade` vira `alunos.idade`). Com várias, um nome igual ao da coluna da subconsulta gera erro pedindo para qualificar |
+| Demais condições do `WHERE` | continuam num `σ` acima das semijunções |
+| Subconsultas aninhadas | cada nível é traduzido da mesma forma, de fora para dentro |
+
+**Diferença em relação ao SQL.** Se uma subconsulta de comparação devolver
+**mais de uma linha**, o SQL dá erro (o SQLite usa a primeira linha). A semijunção
+compara com todas, como `> ANY (…)`. Com zero ou uma linha, os resultados são
+iguais: uma subconsulta vazia não deixa passar nenhuma linha, nos dois casos.
+
+**Otimização (`--otimizar`).** Cada subconsulta é otimizada separadamente. Uma
+seleção acima de `R ⋉ S` sempre pode descer para `R`, pois só as colunas de `R`
+existem acima da semijunção. Projeções descem mantendo as colunas usadas na
+condição θ.
+
+**O que não é aceito** (todos geram erro semântico com a posição):
+
+| Consulta | Motivo |
+|---|---|
+| `… WHERE x IN (SELECT y FROM b WHERE b.k = a.k)` | subconsulta correlacionada: exigiria descorrelacionar |
+| `… WHERE x NOT IN (SELECT …)` | exigiria antijunção e o tratamento de `NULL` do `NOT IN` |
+| `… WHERE EXISTS (SELECT …)` | em geral exige correlação |
+| `… WHERE x = 1 OR x IN (SELECT …)` | dentro de `OR` ou `NOT`, a semijunção mudaria o resultado |
+| `… JOIN b ON a.i IN (SELECT …)` | subconsulta no `ON` |
+| `… IN (SELECT * …)` ou `… IN (SELECT y, z …)` | a subconsulta deve devolver uma coluna |
+
+**Como a tradução é verificada.** `TestesSqlite` executa 18 consultas, com e sem
+subconsulta, no SQLite e nas duas árvores de Álgebra Relacional (canônica e
+otimizada), sobre 30 bancos aleatórios, e exige o mesmo resultado. Nas
+comparações, a subconsulta filtra pelo `id` de `a`, que é único, para devolver no
+máximo uma linha, como o SQL exige. Para validar o próprio teste, foram inseridos
+três bugs, e os três foram detectados:
+
+* traduzir com junção em vez de semijunção;
+* mandar a seleção para dentro da subconsulta;
+* não qualificar a coluna externa.
+
 ---
 
 ## 7. Limitações e melhorias possíveis
@@ -814,9 +906,15 @@ inseridos bugs no otimizador, como separar `OR` como se fosse `AND`, e o teste o
 **Limitações atuais:**
 
 * Subconjunto de SQL: não há `DISTINCT`, `GROUP BY`/`HAVING`, agregações,
-  `ORDER BY`, subconsultas, `UNION`/`INTERSECT`/`EXCEPT`, `IN`, `LIKE`,
+  `ORDER BY`, `UNION`/`INTERSECT`/`EXCEPT`, `IN` com lista de valores, `LIKE`,
   `BETWEEN`, `IS NULL`, expressões aritméticas, apelidos de colunas
   (`nome AS n`), `LEFT/RIGHT/FULL/NATURAL/CROSS JOIN` nem `JOIN … USING`.
+* Subconsultas: só as não correlacionadas, como comparação ou `IN`, ligadas por
+  `AND` no `WHERE`. Não há `EXISTS`, `NOT IN`, correlação nem subconsulta no
+  `FROM` ou no `SELECT`. A comparação com subconsulta de várias linhas se comporta
+  como `ANY` (seção 6.7).
+* Sem esquema, uma coluna sem tabela dentro da subconsulta é considerada da
+  própria subconsulta. Se ela fosse da consulta externa, a correlação não seria detectada.
 * **Semântica de conjuntos × multiconjuntos:** a álgebra relacional clássica
   elimina duplicatas e o `SELECT` do SQL não. A tradução `π` equivale, a
   rigor, a `SELECT DISTINCT`.
@@ -837,7 +935,8 @@ inseridos bugs no otimizador, como separar `OR` como se fosse `AND`, e o teste o
   automaticamente as não qualificadas. Isso também eliminaria os limites do
   otimizador descritos na seção 6.6.
 * Ampliar a gramática com `DISTINCT` (π com/sem eliminação de duplicatas),
-  `UNION` (∪), `EXCEPT` (−), `GROUP BY` (operador γ) e subconsultas
-  (autoincorporação de `consulta` dentro de `fator`).
+  `UNION` (∪), `EXCEPT` (−) e `GROUP BY` (operador γ).
+* `NOT IN` e `NOT EXISTS` não correlacionados com antijunção (`▷`), e subconsultas
+  correlacionadas por descorrelação.
 * Gerar a saída também em LaTeX (`\pi_{nome}(\sigma_{idade \geq 18}(alunos))`).
 * Recuperação de erros com produções `error` para relatar vários erros de uma vez.

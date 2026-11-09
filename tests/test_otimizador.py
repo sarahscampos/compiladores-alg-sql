@@ -12,7 +12,7 @@ import unittest
 from main import caminho_otimizado
 from sql_ar import traduzir
 from sql_ar.algebra import (Juncao, ProdutoCartesiano, Projecao, Relacao,
-                            Renomeacao, Selecao)
+                            Renomeacao, Selecao, Semijuncao)
 from sql_ar.ast_sql import Coluna, Comparacao, E, Nao, Numero, Ou, Texto
 
 OPERADORES = {'=': operator.eq, '!=': operator.ne, '<>': operator.ne,
@@ -70,6 +70,10 @@ def avaliar(expressao, banco):
         return sem_repeticao(
             {(a.tabela, a.nome): valor_coluna(a, l) for a in expressao.atributos}
             for l in avaliar(expressao.expressao, banco))
+    if isinstance(expressao, Semijuncao):
+        direita = avaliar(expressao.direita, banco)
+        return [e for e in avaliar(expressao.esquerda, banco)
+                if any(verdadeira(expressao.condicao, {**e, **d}) for d in direita)]
     pares = [{**e, **d} for e in avaliar(expressao.esquerda, banco)
              for d in avaliar(expressao.direita, banco)]
     if isinstance(expressao, Juncao):

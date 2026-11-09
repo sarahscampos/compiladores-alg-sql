@@ -39,7 +39,18 @@ class Texto:
         return "'" + self.valor.replace("'", "''") + "'"
 
 
-Operando = Union[Coluna, Numero, Texto]
+@dataclass(frozen=True)
+class Subconsulta:
+    """( SELECT ... ) usada como operando ou após IN / EXISTS."""
+    consulta: 'Consulta'
+    linha: Optional[int] = field(default=None, compare=False)
+    indice: Optional[int] = field(default=None, compare=False)
+
+    def __str__(self):
+        return '(SELECT ...)'
+
+
+Operando = Union[Coluna, Numero, Texto, Subconsulta]
 
 
 # --- Condições (WHERE e ON) ----------------------------------------------
@@ -68,7 +79,28 @@ class Nao:
     operando: 'Condicao'
 
 
-Condicao = Union[Comparacao, E, Ou, Nao]
+@dataclass(frozen=True)
+class Em:
+    """operando IN (subconsulta), ou NOT IN quando negado."""
+    operando: Operando
+    subconsulta: Subconsulta
+    negado: bool = False
+
+
+@dataclass(frozen=True)
+class Existe:
+    """EXISTS (subconsulta)"""
+    subconsulta: Subconsulta
+
+
+Condicao = Union[Comparacao, E, Ou, Nao, Em, Existe]
+
+
+def separar_conjuncoes(condicao):
+    """c1 AND (c2 AND c3)  ->  [c1, c2, c3]"""
+    if isinstance(condicao, E):
+        return separar_conjuncoes(condicao.esquerda) + separar_conjuncoes(condicao.direita)
+    return [condicao]
 
 
 # --- Cláusula FROM -------------------------------------------------------
