@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Árvore sintática abstrata (AST) da consulta SQL.
 
 Estes nós são produzidos pelas ações semânticas do parser. Eles registram

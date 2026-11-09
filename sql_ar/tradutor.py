@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Fachada que encadeia as fases: léxica -> sintática -> semântica -> tradução."""
 from dataclasses import dataclass
 
@@ -16,6 +17,7 @@ class ResultadoTraducao:
     consulta: Consulta                    # AST SQL
     expressao: algebra.ExprRelacional     # árvore da Álgebra Relacional
     reducoes: list                        # reduções feitas pelo parser LR
+    valores: list = None                  # atributos dos filhos em cada redução
 
     @property
     def texto(self):
@@ -41,8 +43,16 @@ class ResultadoTraducao:
     def derivacao(self):
         return formatar_derivacao(self.reducoes)
 
-    def arvore_sintatica(self):
-        return formatar_arvore_sintatica(arvore_sintatica(self.reducoes))
+    def arvore_derivacao(self):
+        """Árvore de derivação com o atributo .val de cada não terminal."""
+        return arvore_sintatica(self.reducoes, self.valores, self.consulta)
+
+    def arvore_sintatica(self, anotada=False):
+        return formatar_arvore_sintatica(self.arvore_derivacao(), anotada=anotada)
+
+    def salvar_grafo_derivacao(self, caminho, anotada=False):
+        """Salva a árvore de derivação (anotada ou não) como grafo em SVG."""
+        grafo.salvar_svg_derivacao(self.arvore_derivacao(), caminho, anotada)
 
 
 def traduzir(sql: str) -> ResultadoTraducao:
@@ -50,7 +60,8 @@ def traduzir(sql: str) -> ResultadoTraducao:
     parser = SqlParser()
     consulta = parser.analisar(sql)
     semantica.analisar(consulta, sql)
-    return ResultadoTraducao(sql, consulta, algebra.traduzir(consulta), parser.reducoes)
+    return ResultadoTraducao(sql, consulta, algebra.traduzir(consulta),
+                             parser.reducoes, parser.valores)
 
 
 def listar_tokens(sql: str):

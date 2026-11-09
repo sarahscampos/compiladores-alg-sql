@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Tradutor de SQL para Álgebra Relacional construído com SLY."""
 from .erros import ErroLexico, ErroSemantico, ErroSintatico, ErroTraducao
 from .tradutor import ResultadoTraducao, listar_tokens, traduzir

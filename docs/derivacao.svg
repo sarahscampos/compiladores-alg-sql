@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1332" height="858" viewBox="0 0 1332 858">
+<title>Árvore de derivação</title>
+<style>
+    .aresta { stroke: #64748b; stroke-width: 1.5; }
+    .no { stroke-width: 1.5; }
+    text { font-family: Consolas, 'DejaVu Sans Mono', Menlo, monospace; fill: #1e293b; }
+    .simbolo { font-size: 22px; font-weight: bold; }
+    .detalhe { font-size: 14px; }
+    .relacao .no { fill: #f1f5f9; stroke: #475569; }
+    .relacao .detalhe { font-weight: bold; }
+    .projecao .no { fill: #dbeafe; stroke: #2563eb; }
+    .selecao .no { fill: #fef3c7; stroke: #d97706; }
+    .juncao .no { fill: #dcfce7; stroke: #16a34a; }
+    .produto .no { fill: #fee2e2; stroke: #dc2626; }
+    .renomeacao .no { fill: #f3e8ff; stroke: #9333ea; }
+    .semijuncao .no { fill: #ccfbf1; stroke: #0d9488; }
+    .nao-terminal .no { fill: #eef2ff; stroke: #4f46e5; }
+    .nao-terminal text.detalhe:first-of-type { font-weight: bold; }
+    .terminal .no { fill: #ecfdf5; stroke: #059669; }
+    .vazio .no { fill: #ffffff; stroke: #94a3b8; stroke-dasharray: 4 3; }
+</style>
+<rect width="1332" height="858" fill="#ffffff"/>
+<line class="aresta" x1="666.1" y1="64.0" x2="627.2" y2="106.0"/>
+<line class="aresta" x1="666.1" y1="64.0" x2="1287.3" y2="106.0"/>
+<line class="aresta" x1="627.2" y1="150.0" x2="66.4" y2="192.0"/>
+<line class="aresta" x1="627.2" y1="150.0" x2="316.6" y2="192.0"/>
+<line class="aresta" x1="627.2" y1="150.0" x2="558.2" y2="192.0"/>
+<line class="aresta" x1="627.2" y1="150.0" x2="691.9" y2="192.0"/>
+<line class="aresta" x1="627.2" y1="150.0" x2="1011.1" y2="192.0"/>
+<line class="aresta" x1="316.6" y1="236.0" x2="316.6" y2="278.0"/>
+<line class="aresta" x1="316.6" y1="322.0" x2="208.7" y2="364.0"/>
+<line class="aresta" x1="316.6" y1="322.0" x2="329.5" y2="364.0"/>
+<line class="aresta" x1="316.6" y1="322.0" x2="437.4" y2="364.0"/>
+<line class="aresta" x1="208.7" y1="408.0" x2="208.7" y2="450.0"/>
+<line class="aresta" x1="208.7" y1="494.0" x2="208.7" y2="536.0"/>
+<line class="aresta" x1="208.7" y1="580.0" x2="208.7" y2="622.0"/>
+<line class="aresta" x1="437.4" y1="408.0" x2="437.4" y2="450.0"/>
+<line class="aresta" x1="437.4" y1="494.0" x2="437.4" y2="536.0"/>
+<line class="aresta" x1="691.9" y1="236.0" x2="691.9" y2="278.0"/>
+<line class="aresta" x1="691.9" y1="322.0" x2="691.9" y2="364.0"/>
+<line class="aresta" x1="691.9" y1="408.0" x2="691.9" y2="450.0"/>
+<line class="aresta" x1="1011.1" y1="236.0" x2="829.9" y2="278.0"/>
+<line class="aresta" x1="1011.1" y1="236.0" x2="1067.2" y2="278.0"/>
+<line class="aresta" x1="1067.2" y1="322.0" x2="1067.2" y2="364.0"/>
+<line class="aresta" x1="1067.2" y1="408.0" x2="1067.2" y2="450.0"/>
+<line class="aresta" x1="1067.2" y1="494.0" x2="1067.2" y2="536.0"/>
+<line class="aresta" x1="1067.2" y1="580.0" x2="955.0" y2="622.0"/>
+<line class="aresta" x1="1067.2" y1="580.0" x2="1075.8" y2="622.0"/>
+<line class="aresta" x1="1067.2" y1="580.0" x2="1188.0" y2="622.0"/>
+<line class="aresta" x1="955.0" y1="666.0" x2="955.0" y2="708.0"/>
+<line class="aresta" x1="955.0" y1="752.0" x2="955.0" y2="794.0"/>
+<line class="aresta" x1="1075.8" y1="666.0" x2="1075.8" y2="708.0"/>
+<line class="aresta" x1="1188.0" y1="666.0" x2="1188.0" y2="708.0"/>
+<line class="aresta" x1="1287.3" y1="150.0" x2="1287.3" y2="192.0"/>
+<g class="nao-terminal"><rect class="no" x="619.7" y="20.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="631.7" y="42.0" dominant-baseline="central" xml:space="preserve">consulta</text></g>
+<g class="nao-terminal"><rect class="no" x="585.1" y="106.0" width="84.2" height="44.0" rx="8"/><text class="detalhe" x="597.1" y="128.0" dominant-baseline="central" xml:space="preserve">selecao</text></g>
+<g class="terminal"><rect class="no" x="20.0" y="192.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="32.0" y="214.0" dominant-baseline="central" xml:space="preserve">&quot;SELECT&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="248.7" y="192.0" width="135.8" height="44.0" rx="8"/><text class="detalhe" x="260.7" y="214.0" dominant-baseline="central" xml:space="preserve">lista_selecao</text></g>
+<g class="nao-terminal"><rect class="no" x="248.7" y="278.0" width="135.8" height="44.0" rx="8"/><text class="detalhe" x="260.7" y="300.0" dominant-baseline="central" xml:space="preserve">lista_colunas</text></g>
+<g class="nao-terminal"><rect class="no" x="140.8" y="364.0" width="135.8" height="44.0" rx="8"/><text class="detalhe" x="152.8" y="386.0" dominant-baseline="central" xml:space="preserve">lista_colunas</text></g>
+<g class="nao-terminal"><rect class="no" x="170.9" y="450.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="182.9" y="472.0" dominant-baseline="central" xml:space="preserve">coluna</text></g>
+<g class="nao-terminal"><rect class="no" x="153.7" y="536.0" width="110.0" height="44.0" rx="8"/><text class="detalhe" x="165.7" y="558.0" dominant-baseline="central" xml:space="preserve">referencia</text></g>
+<g class="terminal"><rect class="no" x="170.9" y="622.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="182.9" y="644.0" dominant-baseline="central" xml:space="preserve">&quot;nome&quot;</text></g>
+<g class="terminal"><rect class="no" x="304.6" y="364.0" width="49.8" height="44.0" rx="8"/><text class="detalhe" x="316.6" y="386.0" dominant-baseline="central" xml:space="preserve">&quot;,&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="399.6" y="364.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="411.6" y="386.0" dominant-baseline="central" xml:space="preserve">coluna</text></g>
+<g class="nao-terminal"><rect class="no" x="382.4" y="450.0" width="110.0" height="44.0" rx="8"/><text class="detalhe" x="394.4" y="472.0" dominant-baseline="central" xml:space="preserve">referencia</text></g>
+<g class="terminal"><rect class="no" x="395.3" y="536.0" width="84.2" height="44.0" rx="8"/><text class="detalhe" x="407.3" y="558.0" dominant-baseline="central" xml:space="preserve">&quot;idade&quot;</text></g>
+<g class="terminal"><rect class="no" x="520.4" y="192.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="532.4" y="214.0" dominant-baseline="central" xml:space="preserve">&quot;FROM&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="624.0" y="192.0" width="135.8" height="44.0" rx="8"/><text class="detalhe" x="636.0" y="214.0" dominant-baseline="central" xml:space="preserve">lista_tabelas</text></g>
+<g class="nao-terminal"><rect class="no" x="641.2" y="278.0" width="101.4" height="44.0" rx="8"/><text class="detalhe" x="653.2" y="300.0" dominant-baseline="central" xml:space="preserve">item_from</text></g>
+<g class="nao-terminal"><rect class="no" x="654.1" y="364.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="666.1" y="386.0" dominant-baseline="central" xml:space="preserve">tabela</text></g>
+<g class="terminal"><rect class="no" x="645.5" y="450.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="657.5" y="472.0" dominant-baseline="central" xml:space="preserve">&quot;alunos&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="938.9" y="192.0" width="144.4" height="44.0" rx="8"/><text class="detalhe" x="950.9" y="214.0" dominant-baseline="central" xml:space="preserve">clausula_where</text></g>
+<g class="terminal"><rect class="no" x="787.8" y="278.0" width="84.2" height="44.0" rx="8"/><text class="detalhe" x="799.8" y="300.0" dominant-baseline="central" xml:space="preserve">&quot;WHERE&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="1020.8" y="278.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="1032.8" y="300.0" dominant-baseline="central" xml:space="preserve">condicao</text></g>
+<g class="nao-terminal"><rect class="no" x="1016.5" y="364.0" width="101.4" height="44.0" rx="8"/><text class="detalhe" x="1028.5" y="386.0" dominant-baseline="central" xml:space="preserve">conjuncao</text></g>
+<g class="nao-terminal"><rect class="no" x="1033.7" y="450.0" width="67.0" height="44.0" rx="8"/><text class="detalhe" x="1045.7" y="472.0" dominant-baseline="central" xml:space="preserve">fator</text></g>
+<g class="nao-terminal"><rect class="no" x="1012.2" y="536.0" width="110.0" height="44.0" rx="8"/><text class="detalhe" x="1024.2" y="558.0" dominant-baseline="central" xml:space="preserve">comparacao</text></g>
+<g class="nao-terminal"><rect class="no" x="908.6" y="622.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="920.6" y="644.0" dominant-baseline="central" xml:space="preserve">operando</text></g>
+<g class="nao-terminal"><rect class="no" x="900.0" y="708.0" width="110.0" height="44.0" rx="8"/><text class="detalhe" x="912.0" y="730.0" dominant-baseline="central" xml:space="preserve">referencia</text></g>
+<g class="terminal"><rect class="no" x="912.9" y="794.0" width="84.2" height="44.0" rx="8"/><text class="detalhe" x="924.9" y="816.0" dominant-baseline="central" xml:space="preserve">&quot;idade&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="1038.0" y="622.0" width="75.6" height="44.0" rx="8"/><text class="detalhe" x="1050.0" y="644.0" dominant-baseline="central" xml:space="preserve">op_rel</text></g>
+<g class="terminal"><rect class="no" x="1046.6" y="708.0" width="58.4" height="44.0" rx="8"/><text class="detalhe" x="1058.6" y="730.0" dominant-baseline="central" xml:space="preserve">&quot;&gt;=&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="1141.6" y="622.0" width="92.8" height="44.0" rx="8"/><text class="detalhe" x="1153.6" y="644.0" dominant-baseline="central" xml:space="preserve">operando</text></g>
+<g class="terminal"><rect class="no" x="1158.8" y="708.0" width="58.4" height="44.0" rx="8"/><text class="detalhe" x="1170.8" y="730.0" dominant-baseline="central" xml:space="preserve">&quot;18&quot;</text></g>
+<g class="nao-terminal"><rect class="no" x="1262.4" y="106.0" width="49.8" height="44.0" rx="8"/><text class="detalhe" x="1274.4" y="128.0" dominant-baseline="central" xml:space="preserve">fim</text></g>
+<g class="terminal"><rect class="no" x="1262.4" y="192.0" width="49.8" height="44.0" rx="8"/><text class="detalhe" x="1274.4" y="214.0" dominant-baseline="central" xml:space="preserve">&quot;;&quot;</text></g>
+</svg>

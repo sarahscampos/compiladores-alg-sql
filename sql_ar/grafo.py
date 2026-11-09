@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Desenha a árvore de consulta (Álgebra Relacional) como um grafo em SVG.
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
+"""Desenha árvores como grafos em SVG: a árvore de consulta (Álgebra
+Relacional) e a árvore de derivação, simples ou anotada com os atributos.
 
 Usa apenas a biblioteca padrão: o resultado é um arquivo .svg que abre em
-qualquer navegador. A raiz fica no topo (último operador avaliado) e as
-relações ficam nas folhas, como nas árvores de consulta dos livros de banco
+qualquer navegador. Na árvore de consulta a raiz fica no topo (último
+operador avaliado) e as relações ficam nas folhas, como nos livros de banco
 de dados.
 """
 import textwrap
@@ -11,6 +13,7 @@ from dataclasses import dataclass, field
 from html import escape
 
 from .algebra import decompor, formatar
+from .derivacao import formatar_valor, rotulo_anotado
 
 # Medidas em pixels. A fonte é monoespaçada para que a largura de um texto
 # possa ser estimada sem medir a fonte (não há como medir sem um navegador).
@@ -44,6 +47,10 @@ ESTILO = """
     .produto .no { fill: #fee2e2; stroke: #dc2626; }
     .renomeacao .no { fill: #f3e8ff; stroke: #9333ea; }
     .semijuncao .no { fill: #ccfbf1; stroke: #0d9488; }
+    .nao-terminal .no { fill: #eef2ff; stroke: #4f46e5; }
+    .nao-terminal text.detalhe:first-of-type { font-weight: bold; }
+    .terminal .no { fill: #ecfdf5; stroke: #059669; }
+    .vazio .no { fill: #ffffff; stroke: #94a3b8; stroke-dasharray: 4 3; }
 """
 
 
@@ -52,6 +59,7 @@ class NoGrafo:
     simbolo: str
     linhas: list
     filhos: list = field(default_factory=list)
+    classe: str = ''
     largura: float = 0
     altura: float = 0
     largura_subarvore: float = 0
@@ -59,14 +67,18 @@ class NoGrafo:
     x: float = 0
     y: float = 0
 
-    @property
-    def classe(self):
-        return CLASSE_POR_SIMBOLO[self.simbolo]
-
 
 def construir_grafo(expressao):
     """Converte a expressão relacional em nós já medidos e posicionados."""
-    raiz = _construir_no(expressao)
+    return _posicionar_arvore(_construir_no(expressao))
+
+
+def construir_grafo_derivacao(arvore, anotada=False):
+    """Mesmo layout para a árvore de derivação (derivacao.No)."""
+    return _posicionar_arvore(_construir_no_derivacao(arvore, anotada))
+
+
+def _posicionar_arvore(raiz):
     alturas = []
     _medir_niveis(raiz, 0, alturas)
     topos = [MARGEM]
@@ -84,7 +96,25 @@ def percorrer(raiz):
 
 
 def gerar_svg(expressao):
-    raiz = construir_grafo(expressao)
+    return _desenhar(construir_grafo(expressao), formatar(expressao))
+
+
+def salvar_svg(expressao, caminho):
+    with open(caminho, 'w', encoding='utf-8') as arquivo:
+        arquivo.write(gerar_svg(expressao))
+
+
+def gerar_svg_derivacao(arvore, anotada=False):
+    titulo = 'Árvore de derivação anotada' if anotada else 'Árvore de derivação'
+    return _desenhar(construir_grafo_derivacao(arvore, anotada), titulo)
+
+
+def salvar_svg_derivacao(arvore, caminho, anotada=False):
+    with open(caminho, 'w', encoding='utf-8') as arquivo:
+        arquivo.write(gerar_svg_derivacao(arvore, anotada))
+
+
+def _desenhar(raiz, titulo):
     nos = list(percorrer(raiz))
     largura = raiz.largura_subarvore + 2 * MARGEM
     altura = max(no.y + no.altura for no in nos) + MARGEM
@@ -93,7 +123,7 @@ def gerar_svg(expressao):
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{largura:.0f}" '
         f'height="{altura:.0f}" viewBox="0 0 {largura:.0f} {altura:.0f}">',
-        f'<title>{escape(formatar(expressao))}</title>',
+        f'<title>{escape(titulo)}</title>',
         f'<style>{ESTILO}</style>',
         f'<rect width="{largura:.0f}" height="{altura:.0f}" fill="#ffffff"/>',
     ]
@@ -108,16 +138,31 @@ def gerar_svg(expressao):
     return '\n'.join(partes) + '\n'
 
 
-def salvar_svg(expressao, caminho):
-    with open(caminho, 'w', encoding='utf-8') as arquivo:
-        arquivo.write(gerar_svg(expressao))
-
-
 def _construir_no(expressao):
     simbolo, detalhe, filhos = decompor(expressao)
-    linhas = textwrap.wrap(detalhe, MAX_CARACTERES_LINHA, break_on_hyphens=False)
-    no = NoGrafo(simbolo, linhas, [_construir_no(filho) for filho in filhos])
+    no = NoGrafo(simbolo, _quebrar(detalhe), [_construir_no(filho) for filho in filhos],
+                 CLASSE_POR_SIMBOLO[simbolo])
+    return _medir(no)
 
+
+def _construir_no_derivacao(no, anotada):
+    if no.terminal:
+        return _medir(NoGrafo('', [f'"{no.rotulo}"'], [], 'terminal'))
+    linhas = [no.rotulo]
+    if anotada and rotulo_anotado(no):
+        linhas += _quebrar('val = ' + formatar_valor(no.valor))
+    # Produção vazia: a folha ε deixa explícito que nada foi derivado
+    filhos = ([_construir_no_derivacao(f, anotada) for f in no.filhos]
+              or [_medir(NoGrafo('', ['ε'], [], 'vazio'))])
+    return _medir(NoGrafo('', linhas, filhos, 'nao-terminal'))
+
+
+def _quebrar(texto):
+    return textwrap.wrap(texto, MAX_CARACTERES_LINHA, break_on_hyphens=False)
+
+
+def _medir(no):
+    simbolo, linhas = no.simbolo, no.linhas
     largura_texto = max(map(len, linhas), default=0) * LARGURA_CARACTERE
     largura_simbolo = LARGURA_SIMBOLO if simbolo else 0
     no.largura = largura_texto + largura_simbolo + 2 * MARGEM_INTERNA

@@ -20,6 +20,12 @@ Sumário:
 5. [Instalação e execução](#5-instalação-e-execução)
 6. [Exemplos, derivações e testes](#6-exemplos-derivações-e-testes)
 7. [Limitações e melhorias possíveis](#7-limitações-e-melhorias-possíveis)
+8. [Trabalho P2: atendimento ao enunciado](#8-trabalho-p2-atendimento-ao-enunciado)
+
+> **Para a avaliação do Trabalho P2**, a seção 8 relaciona cada item do enunciado
+> com o lugar onde ele é atendido. Ela inclui a tabela completa de produções e
+> ações semânticas, as árvores de derivação (simples e anotada), as modificações
+> em relação ao exemplo `calc.py` e o prompt utilizado.
 
 ---
 
@@ -321,6 +327,8 @@ strings de Álgebra Relacional.
 
 São atributos **sintetizados**: cada valor vem dos filhos, como numa
 gramática S-atribuída, que é o modelo natural de um parser ascendente.
+A tabela acima mostra só as produções principais. A tabela completa, com as 43
+produções, está na seção 8.5 e é impressa por `python main.py --producoes`.
 
 Toda ação chama também `self._registrar(p)`. Esse método usa
 `self.production` (definido pelo SLY antes de cada redução) para anotar a
@@ -374,13 +382,14 @@ O código está completo e é executável. Fica no pacote `sql_ar/`:
 | [sql_ar/algebra.py](sql_ar/algebra.py) | nós da Álgebra Relacional, tradução e formatação (linear e em árvore) |
 | [sql_ar/otimizador.py](sql_ar/otimizador.py) | otimização algébrica: seleções e projeções descem na árvore |
 | [sql_ar/grafo.py](sql_ar/grafo.py) | árvore de consulta como grafo em SVG, só com a biblioteca padrão |
-| [sql_ar/derivacao.py](sql_ar/derivacao.py) | derivação mais à direita e árvore sintática a partir das reduções |
+| [sql_ar/derivacao.py](sql_ar/derivacao.py) | derivação mais à direita e árvore de derivação (simples e anotada) a partir das reduções |
 | [sql_ar/erros.py](sql_ar/erros.py) | `ErroLexico`, `ErroSintatico`, `ErroSemantico` com linha, coluna e destaque `^` |
 | [sql_ar/tradutor.py](sql_ar/tradutor.py) | `traduzir(sql)`: encadeia as fases |
 | [main.py](main.py) | interface de linha de comando e modo interativo |
 | [tests/test_tradutor.py](tests/test_tradutor.py) | testes `unittest` do tradutor e do grafo |
 | [tests/test_otimizador.py](tests/test_otimizador.py) | testes do otimizador, incluindo a equivalência entre as árvores |
 | [tests/test_subconsultas.py](tests/test_subconsultas.py) | testes das subconsultas, incluindo a comparação com o SQLite |
+| [tests/test_trabalho.py](tests/test_trabalho.py) | testes dos itens do enunciado: tabela de produções, árvores anotadas e marcação do código |
 
 Uso como biblioteca:
 
@@ -493,11 +502,14 @@ As opções podem vir antes ou depois da consulta e podem ser combinadas.
 | `-f ARQUIVO`, `--arquivo ARQUIVO` | lê as consultas de um arquivo (seção 5.5) |
 | `--exemplos` | roda as consultas de exemplo. A última é inválida de propósito, para mostrar a mensagem de erro |
 | `--tokens` | mostra os tokens reconhecidos pelo lexer |
-| `--arvore` | mostra a árvore relacional e a árvore sintática como texto |
+| `--arvore` | mostra a árvore relacional e a árvore de derivação como texto |
+| `--anotada` | mostra a árvore de derivação anotada com o atributo `.val` de cada não terminal |
 | `--derivacao` | mostra a derivação mais à direita |
+| `--producoes` | mostra a tabela de produções e regras semânticas (funciona sem consulta) |
+| `--grafo-derivacao ARQUIVO.svg` | salva a árvore de derivação em `ARQUIVO.svg` e a anotada em `ARQUIVO_anotada.svg` |
 | `--otimizar` | mostra também a expressão otimizada (seção 6.6) |
 | `--grafo ARQUIVO.svg` | salva a árvore de consulta como grafo |
-| `--abrir` | abre o grafo no navegador. Sem `--grafo`, salva em `arvore_consulta.svg` |
+| `--abrir` | abre os grafos salvos no navegador. Sem `--grafo` nem `--grafo-derivacao`, salva em `arvore_consulta.svg` |
 
 Mostrar a derivação e as árvores:
 
@@ -533,7 +545,8 @@ que continua valendo para as consultas seguintes.
 
 | Comando | O que faz |
 |---|---|
-| `:tokens`, `:arvore`, `:derivacao`, `:otimizar` | ligam ou desligam a opção de mesmo nome |
+| `:tokens`, `:arvore`, `:anotada`, `:derivacao`, `:otimizar` | ligam ou desligam a opção de mesmo nome |
+| `:producoes` | mostra a tabela de produções e regras semânticas |
 | `:grafo` | liga ou desliga o grafo, salvo sempre em `arvore_consulta.svg` |
 | `:exemplos` | roda as consultas de exemplo |
 | `:sair` | encerra (`Ctrl+C` também) |
@@ -592,7 +605,7 @@ python -m unittest -v
 As saídas abaixo foram **obtidas executando o programa** (`python main.py
 --exemplos`) e os oito casos estão automatizados em
 [tests/test_tradutor.py](tests/test_tradutor.py) (classe `TestesObrigatorios`).
-Resultado: `Ran 88 tests … OK`.
+Resultado: `Ran 101 tests … OK`.
 
 ### 6.1 Testes obrigatórios
 
@@ -940,3 +953,414 @@ três bugs, e os três foram detectados:
   correlacionadas por descorrelação.
 * Gerar a saída também em LaTeX (`\pi_{nome}(\sigma_{idade \geq 18}(alunos))`).
 * Recuperação de erros com produções `error` para relatar vários erros de uma vez.
+
+---
+
+## 8. Trabalho P2: atendimento ao enunciado
+
+Esta seção relaciona cada item do enunciado do Trabalho P2 (Compiladores 2026/2)
+com o lugar do projeto onde ele é atendido.
+
+### 8.1 Checklist
+
+| Item do enunciado | Onde está |
+|---|---|
+| 1. Pesquisar geradores de analisadores | seção 8.2 (SLY e comparação com FLEX/BISON e PLY) |
+| 2. Executar um exemplo e não entregar uma calculadora | `calc.py` é o exemplo de partida; seção 8.3 compara os dois |
+| 3. Prompt elaborado numa ferramenta de IA | seção 8.8 |
+| 4a. Gerador escolhido e linguagem | seção 8.2: SLY, em Python |
+| 4b. Onde estão as modificações: expressões regulares, produções, precedência, ambiguidade, ações semânticas, código de usuário | seção 8.4, e marcas `[NOVO]`/`[MODIFICADO]` no código |
+| 4c. Tabela de produções e ações semânticas | seção 8.5 e `python main.py --producoes` |
+| 4d. Árvore de derivação e árvore de derivação anotada | seção 8.6, `--anotada` e `--grafo-derivacao` |
+| 4e. Exemplo executando o código | seção 8.7 (comandos para rodar ao vivo) |
+| 5. Complexidade e ideia diferentes da calculadora | seção 8.3 |
+| 6. Código-fonte com as modificações sinalizadas em comentários | seção 8.4 |
+
+Ficam fora do código: o vídeo de até 7 minutos (há um roteiro na seção 8.9), a
+formação do grupo, os encontros presenciais e a entrega pelo Teams.
+
+### 8.2 Gerador escolhido: SLY (Python)
+
+**SLY** (*Sly Lex-Yacc*), de David Beazley, gera analisadores léxicos e
+sintáticos em Python 3. É o sucessor do PLY, do mesmo autor, e segue a mesma
+ideia do par FLEX/BISON: um analisador léxico baseado em expressões regulares e
+um analisador sintático **LALR(1)** gerado a partir de uma gramática livre de
+contexto.
+
+| | FLEX/BISON | PLY | SLY |
+|---|---|---|---|
+| Linguagem | C | Python | Python 3 |
+| Onde fica a gramática | arquivos `.l` e `.y` separados | docstrings das funções | decorador `@_('...')` nos métodos de uma classe |
+| Geração do analisador | etapa de compilação que gera código C | na execução, com cache em `parsetab.py` | na criação da classe (metaclasse), sem arquivo gerado |
+| Algoritmo | LALR(1) | LALR(1) | LALR(1) |
+
+Como o SLY é usado neste projeto:
+
+* **Lexer** ([sql_ar/lexer.py](sql_ar/lexer.py)): a classe herda de `sly.Lexer`.
+  O conjunto `tokens` declara os terminais; cada token é um atributo com uma
+  expressão regular (`LE = r'<='`) ou um método decorado com `@_(regex)` quando
+  precisa de ação (`ID`, `NUMBER`, `STRING`). O SLY junta os padrões **na ordem
+  em que aparecem** num único regex mestre. Por isso `<=` vem antes de `<`.
+  `ignore` e `ignore_*` descartam espaços e comentários, e `error()` trata
+  caracteres inválidos.
+* **Parser** ([sql_ar/parser.py](sql_ar/parser.py)): a classe herda de
+  `sly.Parser`. Cada método decorado com `@_('lado direito')` é uma produção:
+  o nome do método é o não terminal do lado esquerdo e o corpo é a ação
+  semântica. Os valores dos símbolos são acessados por nome (`p.condicao`,
+  `p.ID0`, `p.ID1`). `start` define o símbolo inicial, e `error()` trata erros
+  de sintaxe. A tabela `precedence`, que o `calc.py` usa, não foi necessária
+  (seção 3.1).
+* Na criação da classe, o SLY monta a tabela LALR e informa os conflitos.
+  Para esta gramática são **73 estados e 0 conflitos**.
+
+### 8.3 Exemplo de partida e diferença para a calculadora
+
+O exemplo executado e analisado primeiro foi a calculadora do SLY,
+[calc.py](calc.py), mantida no repositório como referência. O tradutor
+reaproveita **a estrutura** dela (uma classe `Lexer`, uma classe `Parser`, ações
+nas produções e um laço interativo), mas o problema, a gramática e as ações
+são outros.
+
+| | `calc.py` | Tradutor SQL → Álgebra Relacional |
+|---|---|---|
+| Entrada | expressão aritmética | consulta SQL (`SELECT`, `FROM`, `WHERE`, `JOIN`, subconsultas) |
+| Saída | um número | uma expressão da Álgebra Relacional (π, σ, ×, ⋈, ⋉, ρ) e as suas árvores |
+| Tokens | 7 | 27 |
+| Produções | 8 | 43 |
+| Não terminais | 2 (`statement`, `expr`) | 18 |
+| Estados LALR | 17 | 73 |
+| Ambiguidade | gramática ambígua, resolvida com a tabela `precedence` | gramática não ambígua, com a precedência nos níveis `condicao` > `conjuncao` > `fator` |
+| Recursão | `expr → expr + expr` | à esquerda (listas), à direita (`NOT`) e autoincorporação (parênteses e subconsultas) |
+| Análise semântica | não há (só divisão por zero) | escopo de tabelas, apelidos, colunas qualificadas, subconsultas permitidas |
+| Ações semânticas | calculam o número | constroem a AST, traduzida depois para uma árvore relacional |
+| Além disso | — | otimização da árvore, árvores de derivação (simples e anotada), grafos em SVG, mensagens de erro com linha e coluna |
+
+### 8.4 Onde estão as modificações
+
+As marcas nos comentários seguem o pedido do item 6:
+
+* `[NOVO]`: código que não existe no `calc.py`;
+* `[MODIFICADO]`: parte que existe no `calc.py`, mas foi alterada.
+
+Cada arquivo do pacote começa com uma dessas marcas. Para listar todas:
+
+```bash
+git grep -n -e "\[NOVO\]" -e "\[MODIFICADO\]"
+```
+
+| O que o enunciado pede mostrar | Onde está |
+|---|---|
+| Expressões regulares da análise léxica | [sql_ar/lexer.py](sql_ar/lexer.py): operadores relacionais, pontuação, `STRING`, `NUMBER`, `ID` e comentários |
+| Palavras-chave sem diferença entre maiúsculas e minúsculas | `PALAVRAS_RESERVADAS` e o método `ID` em [sql_ar/lexer.py](sql_ar/lexer.py) |
+| Produções da gramática | métodos `@_` de [sql_ar/parser.py](sql_ar/parser.py), descritos na seção 2 |
+| Precedência e eliminação de ambiguidade | níveis `condicao` → `conjuncao` → `fator` (seção 3.1), no lugar da tabela `precedence` do `calc.py` |
+| Ações semânticas | corpo e docstring de cada método `@_` em [sql_ar/parser.py](sql_ar/parser.py) (seção 8.5) |
+| Tratamento de erros | `error()` do lexer e do parser `[MODIFICADO]`, e [sql_ar/semantica.py](sql_ar/semantica.py) `[NOVO]` |
+| Código de usuário | os demais módulos de `sql_ar/` (AST, semântica, tradução, otimização, grafos e derivação) e [main.py](main.py) |
+
+### 8.5 Tabela de produções e ações semânticas
+
+Cada ação constrói o atributo sintetizado `.val` do não terminal do lado
+esquerdo: um nó da AST ou uma lista. É uma definição **S-atribuída**, avaliada
+de baixo para cima, na ordem das reduções do parser LR. Os índices (₁, ₂)
+distinguem símbolos repetidos na mesma produção.
+
+A tabela abaixo foi gerada por `python main.py --producoes`. As produções vêm da
+gramática que o SLY montou e as regras vêm das docstrings das ações, então ela
+acompanha o código. A numeração é a do SLY, que agrupa as alternativas de cada
+não terminal.
+
+| Nº | Produção | Regra semântica |
+|---|---|---|
+| 1 | `consulta → selecao fim` | `consulta.val = selecao.val` |
+| 2 | `selecao → SELECT lista_selecao FROM lista_tabelas clausula_where` | `selecao.val = Consulta(lista_selecao.val, lista_tabelas.val, clausula_where.val)` |
+| 3 | `fim → ε` | `fim: sem atributo (o ';' é opcional)` |
+| 4 | `fim → SEMI` | `fim: sem atributo (o ';' é opcional)` |
+| 5 | `clausula_where → ε` | `clausula_where.val = nulo` |
+| 6 | `clausula_where → WHERE condicao` | `clausula_where.val = condicao.val` |
+| 7 | `lista_selecao → lista_colunas` | `lista_selecao.val = lista_colunas.val` |
+| 8 | `lista_selecao → STAR` | `lista_selecao.val = nulo (todas as colunas: não haverá π)` |
+| 9 | `lista_colunas → coluna` | `lista_colunas.val = [coluna.val]` |
+| 10 | `lista_colunas → lista_colunas COMMA coluna` | `lista_colunas.val = lista_colunas₁.val + [coluna.val]` |
+| 11 | `coluna → referencia` | `coluna.val = referencia.val` |
+| 12 | `referencia → ID DOT ID` | `referencia.val = Coluna(ID₂.lexema, tabela=ID₁.lexema)` |
+| 13 | `referencia → ID` | `referencia.val = Coluna(ID.lexema)` |
+| 14 | `lista_tabelas → item_from` | `lista_tabelas.val = [item_from.val]` |
+| 15 | `lista_tabelas → lista_tabelas COMMA item_from` | `lista_tabelas.val = lista_tabelas₁.val + [item_from.val]` |
+| 16 | `item_from → tabela` | `item_from.val = tabela.val` |
+| 17 | `item_from → item_from INNER JOIN tabela ON condicao` | `item_from.val = Join(item_from₁.val, tabela.val, condicao.val)` |
+| 18 | `item_from → item_from JOIN tabela ON condicao` | `item_from.val = Join(item_from₁.val, tabela.val, condicao.val)` |
+| 19 | `tabela → ID AS ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
+| 20 | `tabela → ID ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
+| 21 | `tabela → ID` | `tabela.val = Tabela(ID.lexema)` |
+| 22 | `condicao → conjuncao` | `condicao.val = conjuncao.val` |
+| 23 | `condicao → condicao OR conjuncao` | `condicao.val = Ou(condicao₁.val, conjuncao.val)` |
+| 24 | `conjuncao → fator` | `conjuncao.val = fator.val` |
+| 25 | `conjuncao → conjuncao AND fator` | `conjuncao.val = E(conjuncao₁.val, fator.val)` |
+| 26 | `fator → comparacao` | `fator.val = comparacao.val` |
+| 27 | `fator → EXISTS subconsulta` | `fator.val = Existe(subconsulta.val) (rejeitado na análise semântica)` |
+| 28 | `fator → LPAREN condicao RPAREN` | `fator.val = condicao.val (os parênteses só agrupam)` |
+| 29 | `fator → NOT fator` | `fator.val = Nao(fator₁.val)` |
+| 30 | `comparacao → operando NOT IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val, negado) (rejeitado na análise semântica)` |
+| 31 | `comparacao → operando IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val)` |
+| 32 | `comparacao → operando op_rel operando` | `comparacao.val = Comparacao(operando₁.val, op_rel.val, operando₂.val)` |
+| 33 | `op_rel → GE` | `op_rel.val = lexema do operador` |
+| 34 | `op_rel → LE` | `op_rel.val = lexema do operador` |
+| 35 | `op_rel → GT` | `op_rel.val = lexema do operador` |
+| 36 | `op_rel → LT` | `op_rel.val = lexema do operador` |
+| 37 | `op_rel → NE` | `op_rel.val = lexema do operador` |
+| 38 | `op_rel → EQ` | `op_rel.val = lexema do operador` |
+| 39 | `operando → subconsulta` | `operando.val = subconsulta.val` |
+| 40 | `operando → STRING` | `operando.val = Texto(STRING.lexema)` |
+| 41 | `operando → NUMBER` | `operando.val = Numero(NUMBER.lexema)` |
+| 42 | `operando → referencia` | `operando.val = referencia.val` |
+| 43 | `subconsulta → LPAREN selecao RPAREN` | `subconsulta.val = Subconsulta(selecao.val)` |
+
+Depois da análise, a AST passa pela análise semântica e é traduzida para a
+Álgebra Relacional pelas regras da seção 3.3. Na notação de tradução dirigida
+pela sintaxe, com um atributo `.ar`, a tradução de `selecao` é:
+
+```
+selecao.ar = π_{lista_selecao.val}( σ_{clausula_where.val}( lista_tabelas.ar ) )
+lista_tabelas.ar = item_from₁.ar × item_from₂.ar × …
+item_from.ar = item_from₁.ar ⋈_{condicao.val} tabela.ar        (para JOIN … ON)
+tabela.ar = ρ_{apelido}(nome)  ou  nome
+```
+
+Quando `lista_selecao.val` é nulo (`*`), não há π; quando `clausula_where.val` é
+nulo, não há σ. As subconsultas viram semijunções (seção 6.7).
+
+### 8.6 Árvore de derivação e árvore de derivação anotada
+
+Para a sentença `SELECT nome, idade FROM alunos WHERE idade >= 18;`:
+
+```bash
+python main.py "SELECT nome, idade FROM alunos WHERE idade >= 18;" --grafo-derivacao derivacao.svg --abrir
+```
+
+O comando gera os dois grafos abaixo. A **árvore de derivação** mostra as
+produções aplicadas, com os terminais nas folhas. O `ε` aparece quando é usada
+uma produção vazia:
+
+![Árvore de derivação](docs/derivacao.svg)
+
+A **árvore de derivação anotada** acrescenta, em cada não terminal, o valor do
+atributo `.val` calculado pela sua ação semântica. A recursão à esquerda aparece
+nos três nós `lista_colunas`. Cada um aplica uma vez a regra 10 da tabela, e a
+lista cresce de `[nome]` para `[nome, idade]`:
+
+![Árvore de derivação anotada](docs/derivacao_anotada.svg)
+
+A mesma árvore anotada em texto (`python main.py --anotada "…"`):
+
+```
+consulta.val = Consulta(colunas=[nome, idade], origem=[alunos], where=idade >= 18)
+├── selecao.val = Consulta(colunas=[nome, idade], origem=[alunos], where=idade >= 18)
+│   ├── "SELECT"
+│   ├── lista_selecao.val = [nome, idade]
+│   │   └── lista_colunas.val = [nome, idade]
+│   │       ├── lista_colunas.val = [nome]
+│   │       │   └── coluna.val = nome
+│   │       │       └── referencia.val = nome
+│   │       │           └── "nome"
+│   │       ├── ","
+│   │       └── coluna.val = idade
+│   │           └── referencia.val = idade
+│   │               └── "idade"
+│   ├── "FROM"
+│   ├── lista_tabelas.val = [alunos]
+│   │   └── item_from.val = alunos
+│   │       └── tabela.val = alunos
+│   │           └── "alunos"
+│   └── clausula_where.val = idade >= 18
+│       ├── "WHERE"
+│       └── condicao.val = idade >= 18
+│           └── conjuncao.val = idade >= 18
+│               └── fator.val = idade >= 18
+│                   └── comparacao.val = idade >= 18
+│                       ├── operando.val = idade
+│                       │   └── referencia.val = idade
+│                       │       └── "idade"
+│                       ├── op_rel.val = ">="
+│                       │   └── ">="
+│                       └── operando.val = 18
+│                           └── "18"
+└── fim
+    └── ";"
+```
+
+### 8.7 Demonstração (executar ao vivo)
+
+Os comandos abaixo mostram, em ordem, o que o enunciado pede. Rode-os durante o
+vídeo em vez de usar capturas de tela.
+
+Tokens e tradução (análise léxica e sintática):
+
+```bash
+python main.py --tokens "SELECT nome, idade FROM alunos WHERE idade >= 18;"
+```
+
+Tabela de produções e ações semânticas:
+
+```bash
+python main.py --producoes
+```
+
+Árvore de derivação anotada, mostrando a recursão da lista de colunas:
+
+```bash
+python main.py --anotada "SELECT nome, idade, curso FROM alunos;"
+```
+
+Precedência (AND antes de OR, com parênteses):
+
+```bash
+python main.py --anotada "SELECT nome FROM alunos WHERE (curso = 'SI' OR curso = 'CC') AND idade > 18;"
+```
+
+Junção, subconsulta, otimização e grafos:
+
+```bash
+python main.py "SELECT a.nome FROM alunos a JOIN matriculas m ON a.id = m.aluno_id WHERE m.nota > 7 AND a.id IN (SELECT aluno_id FROM bolsas);" --otimizar --grafo arvore.svg --abrir
+```
+
+Erros léxico, sintático e semântico:
+
+```bash
+python main.py "SELECT nome FROM alunos WHERE idade > 1 # x"
+```
+
+```bash
+python main.py "SELECT nome idade FROM alunos;"
+```
+
+```bash
+python main.py "SELECT alunos.nome FROM alunos a;"
+```
+
+### 8.8 Prompt utilizado (item 3)
+
+O projeto foi desenvolvido com o Claude Code a partir do prompt abaixo. Confira
+se ele é o mesmo apresentado ao professor; se não for, substitua pelo prompt
+apresentado.
+
+<details>
+<summary>Prompt inicial</summary>
+
+```text
+Atue como especialista em Compiladores, Gramáticas Livres de Contexto e Álgebra Relacional. Desenvolva um programa completo em Python que traduza consultas SQL para expressões da Álgebra Relacional, utilizando obrigatoriamente a biblioteca SLY, com "Lexer" e "Parser".
+
+1. Explique primeiro a gramática, depois implemente o código.
+
+Antes de programar, apresente a gramática formal em BNF ou EBNF, identificando terminais, não terminais, símbolo inicial e produções. Explique a análise léxica, sintática e semântica, com foco em autoincorporação (recursividade gramatical).
+
+Demonstre a autoincorporação com uma produção como:
+
+lista_colunas → lista_colunas , coluna
+              | coluna
+
+Explique a recursividade à esquerda, o caso-base, o caso recursivo e como essa regra reconhece listas de tamanho variável. Mostre derivações para consultas com várias colunas e identifique as produções recursivas no código SLY. Preserve a recursividade à esquerda quando apropriado, pois o SLY admite esse tipo de produção.
+
+2. Implemente o tradutor.
+
+O programa deve reconhecer:
+
+- "SELECT", "FROM" e "WHERE";
+- listas de colunas e tabelas separadas por vírgulas;
+- "AND", "OR" e parênteses;
+- operadores "=", "!=", "<>", "<", ">", "<=" e ">=";
+- identificadores simples e qualificados, como "alunos.nome";
+- "*", números e textos entre aspas simples;
+- "JOIN ... ON", se possível dentro do escopo.
+
+As palavras-chave devem aceitar maiúsculas e minúsculas. Utilize somente SLY para a análise léxica e sintática, sem substituir o parser por expressões regulares ou manipulação textual.
+
+3. Traduza para Álgebra Relacional.
+
+Utilize os operadores:
+
+- Seleção: σ
+- Projeção: π
+- Produto cartesiano: ×
+- Junção: ⋈
+- Renomeação: ρ, quando necessária.
+
+Exemplo:
+
+Entrada:
+
+SELECT nome, idade
+FROM alunos
+WHERE idade >= 18;
+
+Saída:
+
+π_{nome, idade}(σ_{idade >= 18}(alunos))
+
+Garanta que a tradução preserve a estrutura lógica da consulta. Para condições compostas, defina uma gramática sem ambiguidades, com AND tendo precedência sobre OR e parênteses respeitados. Explique as decisões adotadas.
+
+4. Requisitos do código.
+
+Implemente:
+
+- Lexer com tokens e tratamento de caracteres inválidos.
+- Parser com produções gramaticais e ações semânticas.
+- Construção das expressões relacionais a partir da estrutura sintática.
+- Mensagens claras para erros léxicos e sintáticos.
+- Interface simples para inserir consultas e visualizar os resultados.
+
+Mantenha a gramática formal, o lexer e o parser consistentes. Prefira estruturas intermediárias organizadas a concatenações desordenadas de strings.
+
+5. Testes obrigatórios.
+
+Apresente consultas e resultados esperados para:
+
+1. Uma coluna.
+2. Múltiplas colunas.
+3. "WHERE" com uma condição.
+4. Condições com "AND".
+5. Condições com "OR" e parênteses.
+6. Duas tabelas com produto cartesiano e condição de junção.
+7. "JOIN ... ON".
+8. Consulta sintaticamente inválida.
+
+Demonstre passo a passo a derivação de uma consulta com pelo menos três colunas e explique como a recursividade constrói a projeção. Mostre também como a precedência lógica é preservada.
+
+6. Formato da resposta.
+
+Apresente, nesta ordem:
+
+1. Fundamentos da gramática e da autoincorporação.
+2. Gramática formal completa.
+3. Explicação da precedência e das ações semânticas.
+4. Código Python completo e executável.
+5. Instalação e execução.
+6. Exemplos, derivações e testes.
+7. Limitações e melhorias possíveis.
+
+Antes de finalizar, revise a compatibilidade com a API real do SLY, os tokens, as produções, a recursividade e as ações semânticas. Não omita partes essenciais nem use pseudocódigo. Se não executar os testes, declare isso explicitamente.
+
+Prioridade: produzir uma solução funcional, didática e academicamente correta, demonstrando claramente como uma gramática com autoincorporação reconhece consultas SQL e as traduz para Álgebra Relacional.
+```
+
+</details>
+
+Pedidos seguintes, na ordem:
+
+1. Gerar a árvore de consulta como grafo (a partir da imagem de uma árvore de consulta otimizada).
+2. Adicionar a otimização, para o grafo ficar igual ao da imagem.
+3. Revisar e completar a explicação de como executar o projeto no README.
+4. Aceitar `SELECT` aninhado (subconsultas).
+5. Conferir o projeto contra o enunciado do Trabalho P2 e implementar o que faltasse.
+
+### 8.9 Roteiro sugerido para o vídeo (até 7 minutos)
+
+| Tempo | Conteúdo | Apoio |
+|---|---|---|
+| 0:00–0:45 | Gerador escolhido (SLY, Python), como funciona e o prompt usado | seções 8.2 e 8.8 |
+| 0:45–1:30 | Ponto de partida (`calc.py`) e o que mudou | seção 8.3 |
+| 1:30–2:30 | Análise léxica: expressões regulares, palavras-chave e erros | `lexer.py` e `--tokens` |
+| 2:30–3:45 | Gramática: produções, recursão, precedência sem ambiguidade | seções 2, 3.1 e `parser.py` |
+| 3:45–4:45 | Ações semânticas e tabela de produções | `--producoes` |
+| 4:45–5:45 | Árvore de derivação e árvore anotada | `--grafo-derivacao` |
+| 5:45–7:00 | Execução: tradução, junção, subconsulta, otimização e erros | seção 8.7 |

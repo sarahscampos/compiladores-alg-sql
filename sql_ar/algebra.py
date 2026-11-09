@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Expressões da Álgebra Relacional: estrutura, tradução a partir da AST e formatação.
 
 A tradução segue a forma canônica de uma consulta SELECT-FROM-WHERE:

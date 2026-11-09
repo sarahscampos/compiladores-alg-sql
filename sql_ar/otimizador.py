@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Otimização algébrica (heurística) da árvore de consulta.
 
 Recebe a forma canônica  π_{L}(σ_{C}(R1 × ... × Rn))  e devolve uma árvore

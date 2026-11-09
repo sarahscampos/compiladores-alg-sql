@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Exceções usadas pelas fases do tradutor (léxica, sintática e semântica)."""
 
 

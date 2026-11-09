@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# [NOVO] Arquivo criado neste trabalho; não existe no exemplo calc.py.
 """Análise semântica: verifica nomes de tabelas, qualificadores de colunas e
 onde as subconsultas aparecem.
 
