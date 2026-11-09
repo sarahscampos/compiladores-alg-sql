@@ -183,7 +183,8 @@ def _colunas_das_condicoes(expressao):
 
 
 def _otimizar_subconsultas(expressao):
-    """Otimiza cada subconsulta (lado direito das semijunções) por conta própria."""
+    """Otimiza cada subconsulta (lado direito das semijunções e tabelas
+    derivadas do FROM) por conta própria."""
     if isinstance(expressao, Semijuncao):
         subconsulta = expressao.direita   # ρ_{apelido}(consulta interna)
         return replace(expressao,
@@ -195,6 +196,9 @@ def _otimizar_subconsultas(expressao):
                        direita=_otimizar_subconsultas(expressao.direita))
     if isinstance(expressao, (Selecao, Projecao)):
         return replace(expressao, expressao=_otimizar_subconsultas(expressao.expressao))
+    if isinstance(expressao, Renomeacao) and not isinstance(expressao.expressao, Relacao):
+        # Subconsulta do FROM: ρ_{t}(consulta), otimizada por conta própria
+        return replace(expressao, expressao=otimizar(expressao.expressao))
     return expressao
 
 

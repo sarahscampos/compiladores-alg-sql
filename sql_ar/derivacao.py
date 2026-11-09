@@ -8,7 +8,8 @@ de reduções obtemos a derivação mais à direita a partir do símbolo inicial
 """
 from typing import NamedTuple
 
-from .ast_sql import Comparacao, Consulta, E, Em, Existe, Join, Nao, Ou, Tabela
+from .ast_sql import (Comparacao, Consulta, E, Em, Existe, Join, Nao, Ou, Tabela,
+                      TabelaDerivada)
 
 
 def derivacao_mais_a_direita(reducoes, inicial='consulta'):
@@ -87,6 +88,8 @@ def formatar_valor(valor):
         return '[' + ', '.join(formatar_valor(v) for v in valor) + ']'
     if isinstance(valor, Tabela):
         return f'{valor.nome} AS {valor.apelido}' if valor.apelido else valor.nome
+    if isinstance(valor, TabelaDerivada):
+        return f'(SELECT ...) AS {valor.apelido}' if valor.apelido else '(SELECT ...)'
     if isinstance(valor, Join):
         return (f'{formatar_valor(valor.esquerda)} JOIN {formatar_valor(valor.direita)} '
                 f'ON {formatar_valor(valor.condicao)}')

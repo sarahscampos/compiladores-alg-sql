@@ -76,6 +76,12 @@ class TestesArvoreAnotada(unittest.TestCase):
             "NOT (a.x = 1 OR a.y = 'z') AND a.k IN (SELECT ...)")
         self.assertEqual(formatar_valor(r.consulta.origem), '[t AS a JOIN u ON a.i = u.i]')
 
+    def test_tabela_derivada_na_arvore_anotada(self):
+        arvore = traduzir('SELECT t.x FROM (SELECT x FROM a) t').arvore_sintatica(anotada=True)
+        self.assertIn('tabela.val = (SELECT ...) AS t', arvore)
+        self.assertIn('origem=[(SELECT ...) AS t]', arvore)
+        self.assertNotIn('TabelaDerivada(', arvore)
+
 
 class TestesGrafoDerivacao(unittest.TestCase):
 

@@ -53,7 +53,7 @@ Um não terminal `A` é **recursivo** quando `A ⇒⁺ α A β`. Há três casos
 |---|---|---|
 | `A ⇒⁺ A β` | recursão à esquerda | `lista_colunas → lista_colunas , coluna` |
 | `A ⇒⁺ α A` | recursão à direita | `fator → NOT fator` |
-| `A ⇒⁺ α A β`, com α ≠ ε e β ≠ ε | **autoincorporação** (*self-embedding*) em sentido estrito | `condicao ⇒⁺ ( condicao )` e `selecao ⇒⁺ … ( selecao )` (subconsulta) |
+| `A ⇒⁺ α A β`, com α ≠ ε e β ≠ ε | **autoincorporação** (*self-embedding*) em sentido estrito | `condicao ⇒⁺ ( condicao )` e `selecao ⇒⁺ … ( selecao )` (subconsulta no `WHERE` ou no `FROM`) |
 
 > **Observação sobre o termo.** Em muitos materiais didáticos, "autoincorporação"
 > é usado para qualquer regra em que o não terminal aparece no próprio lado
@@ -65,7 +65,8 @@ Um não terminal `A` é **recursivo** quando `A ⇒⁺ α A β`. Há três casos
 > Nesta gramática, a autoincorporação estrita aparece em dois lugares:
 > `condicao → conjuncao → fator → ( condicao )` e nas subconsultas, em que uma
 > consulta inteira aparece dentro de outra:
-> `selecao ⇒⁺ SELECT … WHERE operando op_rel ( selecao )` (seção 6.7).
+> `selecao ⇒⁺ SELECT … WHERE operando op_rel ( selecao )` e
+> `selecao ⇒⁺ SELECT … FROM ( selecao ) t` (seção 6.7).
 > As duas formas de recursão estão no código e são explicadas abaixo.
 
 ### 1.3 A lista de colunas recursiva à esquerda
@@ -204,6 +205,9 @@ item_from      → item_from JOIN tabela ON condicao         (* recursiva à esq
 tabela         → ID
                | ID ID                             (* apelido *)
                | ID AS ID
+               | subconsulta ID                    (* tabela derivada *)
+               | subconsulta AS ID
+               | subconsulta                       (* reconhecido, mas rejeitado na semântica *)
 
 condicao       → condicao OR conjuncao             (* nível 1: OR *)
                | conjuncao
@@ -239,7 +243,7 @@ consulta   = selecao [ ";" ] ;
 selecao    = "SELECT" ( "*" | coluna { "," coluna } ) "FROM" item_from { "," item_from }
              [ "WHERE" condicao ] ;
 item_from  = tabela { [ "INNER" ] "JOIN" tabela "ON" condicao } ;
-tabela     = ID [ [ "AS" ] ID ] ;
+tabela     = ID [ [ "AS" ] ID ] | subconsulta [ [ "AS" ] ID ] ;
 condicao   = conjuncao { "OR" conjuncao } ;
 conjuncao  = fator { "AND" fator } ;
 fator      = "NOT" fator | "(" condicao ")" | "EXISTS" subconsulta
@@ -249,7 +253,7 @@ subconsulta = "(" selecao ")" ;
 referencia = ID [ "." ID ] ;
 ```
 
-O SLY gera para essa gramática uma tabela LALR(1) com **73 estados e nenhum
+O SLY gera para essa gramática uma tabela LALR(1) com **77 estados e nenhum
 conflito** (shift/reduce = 0, reduce/reduce = 0), o que foi verificado por
 `SqlParser._lrtable.sr_conflicts` / `rr_conflicts`. Logo, a gramática não é
 ambígua para o SLY.
@@ -322,12 +326,13 @@ strings de Álgebra Relacional.
 | `comparacao → operando op_rel operando` | `Comparacao(esq, op, dir)` |
 | `comparacao → operando IN subconsulta` | `Em(operando, subconsulta)` |
 | `subconsulta → ( selecao )` | `Subconsulta(consulta)` |
+| `tabela → subconsulta ID` | `TabelaDerivada(consulta, apelido)` |
 | `selecao → SELECT …` | `Consulta(colunas, origem, where)` |
 | `consulta → selecao fim` | a própria `Consulta` |
 
 São atributos **sintetizados**: cada valor vem dos filhos, como numa
 gramática S-atribuída, que é o modelo natural de um parser ascendente.
-A tabela acima mostra só as produções principais. A tabela completa, com as 43
+A tabela acima mostra só as produções principais. A tabela completa, com as 46
 produções, está na seção 8.5 e é impressa por `python main.py --producoes`.
 
 Toda ação chama também `self._registrar(p)`. Esse método usa
@@ -356,6 +361,7 @@ SELECT L FROM R₁, …, Rₙ WHERE C   ⟶   π_{L}( σ_{C}( R₁ × … × R�
 | `SELECT *` | sem `π` |
 | `AND` / `OR` / `NOT` | `∧` / `∨` / `¬` |
 | `WHERE x op (SELECT y …)` / `WHERE x IN (SELECT y …)` | `R ⋉_{x op sub1.y} ρ_{sub1}(…)` (semijunção, seção 6.7) |
+| `FROM (SELECT …) t` | `ρ_{t}(…)`, a tradução da subconsulta renomeada (seção 6.7) |
 
 A formatação usa parênteses **mínimos que preservam a estrutura**: um `∨`
 dentro de um `∧` recebe parênteses. Um operador do mesmo nível à direita,
@@ -605,7 +611,7 @@ python -m unittest -v
 As saídas abaixo foram **obtidas executando o programa** (`python main.py
 --exemplos`) e os oito casos estão automatizados em
 [tests/test_tradutor.py](tests/test_tradutor.py) (classe `TestesObrigatorios`).
-Resultado: `Ran 101 tests … OK`.
+Resultado: `Ran 116 tests … OK`.
 
 ### 6.1 Testes obrigatórios
 
@@ -844,8 +850,11 @@ inseridos bugs no otimizador, como separar `OR` como se fosse `AND`, e o teste o
 
 ### 6.7 Subconsultas
 
-São aceitas subconsultas **não correlacionadas** em duas formas, como condição do
-`WHERE` ligada às demais por `AND`:
+São aceitas subconsultas **não correlacionadas** no `WHERE` e no `FROM`.
+
+#### No `WHERE`
+
+Duas formas, como condição do `WHERE` ligada às demais por `AND`:
 
 * `operando op_rel (SELECT coluna …)`, comparação com o valor da subconsulta;
 * `operando IN (SELECT coluna …)`.
@@ -901,8 +910,8 @@ condição θ.
 | `… JOIN b ON a.i IN (SELECT …)` | subconsulta no `ON` |
 | `… IN (SELECT * …)` ou `… IN (SELECT y, z …)` | a subconsulta deve devolver uma coluna |
 
-**Como a tradução é verificada.** `TestesSqlite` executa 18 consultas, com e sem
-subconsulta, no SQLite e nas duas árvores de Álgebra Relacional (canônica e
+**Como a tradução é verificada.** `TestesSqlite` executa 26 consultas, com e sem
+subconsulta (no `WHERE` e no `FROM`), no SQLite e nas duas árvores de Álgebra Relacional (canônica e
 otimizada), sobre 30 bancos aleatórios, e exige o mesmo resultado. Nas
 comparações, a subconsulta filtra pelo `id` de `a`, que é único, para devolver no
 máximo uma linha, como o SQL exige. Para validar o próprio teste, foram inseridos
@@ -911,6 +920,46 @@ três bugs, e os três foram detectados:
 * traduzir com junção em vez de semijunção;
 * mandar a seleção para dentro da subconsulta;
 * não qualificar a coluna externa.
+
+#### No `FROM` (tabelas derivadas)
+
+Uma consulta pode ocupar o lugar de uma tabela, com um apelido obrigatório:
+
+```bash
+python main.py "SELECT t.nome FROM (SELECT nome, idade FROM alunos WHERE idade > 18) t WHERE t.idade < 30;"
+```
+
+```
+π_{t.nome}(σ_{t.idade < 30}(ρ_{t}(π_{nome, idade}(σ_{idade > 18}(alunos)))))
+```
+
+A tradução é direta: a subconsulta é traduzida normalmente, e o resultado
+recebe o nome do apelido por uma renomeação `ρ_{t}`. Depois disso, ela se comporta
+como qualquer tabela: pode entrar em `×`, em `JOIN … ON` e ter suas colunas
+usadas como `t.coluna`. A subconsulta do `FROM` também pode conter subconsultas,
+no `WHERE` ou no próprio `FROM`.
+
+| Situação | Decisão |
+|---|---|
+| Apelido | obrigatório, como no SQL padrão. Ele é o nome usado no `ρ` |
+| Colunas | podem ser várias, ou `*` quando o `FROM` interno tem uma tabela só |
+| Verificação de colunas | como a lista de colunas da subconsulta é conhecida, `t.y` é rejeitado se a subconsulta não devolve `y`. Isso não é possível com tabelas comuns, sem esquema |
+| Escopo | a subconsulta não enxerga as outras tabelas do `FROM` (não há `LATERAL`) |
+| Otimização | a subconsulta é otimizada separadamente; seleções e projeções da consulta externa param acima do `ρ_{t}` |
+
+Não são aceitos, com erro semântico:
+
+| Consulta | Motivo |
+|---|---|
+| `… FROM (SELECT x FROM a)` | falta o apelido |
+| `… FROM (SELECT * FROM a, b) t` | sem esquema, colunas com o mesmo nome nas duas tabelas não seriam detectadas |
+| `… FROM (SELECT a.id, b.id FROM a, b) t` | duas colunas `id` ficariam com o mesmo nome depois do `ρ_{t}` |
+| `… FROM b, (SELECT x FROM a WHERE a.k = b.k) t` | subconsulta correlacionada (exigiria `LATERAL`) |
+| `SELECT t.y FROM (SELECT x FROM a) t` | a subconsulta não devolve `y` |
+
+A comparação com o SQLite descrita acima inclui 8 consultas com tabelas
+derivadas. Um bug colocado de propósito, que ignorava o `WHERE` e a projeção da
+subconsulta do `FROM`, foi detectado.
 
 ---
 
@@ -922,10 +971,10 @@ três bugs, e os três foram detectados:
   `ORDER BY`, `UNION`/`INTERSECT`/`EXCEPT`, `IN` com lista de valores, `LIKE`,
   `BETWEEN`, `IS NULL`, expressões aritméticas, apelidos de colunas
   (`nome AS n`), `LEFT/RIGHT/FULL/NATURAL/CROSS JOIN` nem `JOIN … USING`.
-* Subconsultas: só as não correlacionadas, como comparação ou `IN`, ligadas por
-  `AND` no `WHERE`. Não há `EXISTS`, `NOT IN`, correlação nem subconsulta no
-  `FROM` ou no `SELECT`. A comparação com subconsulta de várias linhas se comporta
-  como `ANY` (seção 6.7).
+* Subconsultas: só as não correlacionadas. No `WHERE`, como comparação ou `IN`,
+  ligadas por `AND`; no `FROM`, como tabela derivada com apelido. Não há `EXISTS`,
+  `NOT IN`, correlação, `LATERAL` nem subconsulta no `SELECT`. A comparação com
+  subconsulta de várias linhas se comporta como `ANY` (seção 6.7).
 * Sem esquema, uma coluna sem tabela dentro da subconsulta é considerada da
   própria subconsulta. Se ela fosse da consulta externa, a correlação não seria detectada.
 * **Semântica de conjuntos × multiconjuntos:** a álgebra relacional clássica
@@ -1011,7 +1060,7 @@ Como o SLY é usado neste projeto:
   de sintaxe. A tabela `precedence`, que o `calc.py` usa, não foi necessária
   (seção 3.1).
 * Na criação da classe, o SLY monta a tabela LALR e informa os conflitos.
-  Para esta gramática são **73 estados e 0 conflitos**.
+  Para esta gramática são **77 estados e 0 conflitos**.
 
 ### 8.3 Exemplo de partida e diferença para a calculadora
 
@@ -1023,12 +1072,12 @@ são outros.
 
 | | `calc.py` | Tradutor SQL → Álgebra Relacional |
 |---|---|---|
-| Entrada | expressão aritmética | consulta SQL (`SELECT`, `FROM`, `WHERE`, `JOIN`, subconsultas) |
+| Entrada | expressão aritmética | consulta SQL (`SELECT`, `FROM`, `WHERE`, `JOIN`, subconsultas no `WHERE` e no `FROM`) |
 | Saída | um número | uma expressão da Álgebra Relacional (π, σ, ×, ⋈, ⋉, ρ) e as suas árvores |
 | Tokens | 7 | 27 |
-| Produções | 8 | 43 |
+| Produções | 8 | 46 |
 | Não terminais | 2 (`statement`, `expr`) | 18 |
-| Estados LALR | 17 | 73 |
+| Estados LALR | 17 | 77 |
 | Ambiguidade | gramática ambígua, resolvida com a tabela `precedence` | gramática não ambígua, com a precedência nos níveis `condicao` > `conjuncao` > `fator` |
 | Recursão | `expr → expr + expr` | à esquerda (listas), à direita (`NOT`) e autoincorporação (parênteses e subconsultas) |
 | Análise semântica | não há (só divisão por zero) | escopo de tabelas, apelidos, colunas qualificadas, subconsultas permitidas |
@@ -1090,31 +1139,34 @@ não terminal.
 | 16 | `item_from → tabela` | `item_from.val = tabela.val` |
 | 17 | `item_from → item_from INNER JOIN tabela ON condicao` | `item_from.val = Join(item_from₁.val, tabela.val, condicao.val)` |
 | 18 | `item_from → item_from JOIN tabela ON condicao` | `item_from.val = Join(item_from₁.val, tabela.val, condicao.val)` |
-| 19 | `tabela → ID AS ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
-| 20 | `tabela → ID ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
-| 21 | `tabela → ID` | `tabela.val = Tabela(ID.lexema)` |
-| 22 | `condicao → conjuncao` | `condicao.val = conjuncao.val` |
-| 23 | `condicao → condicao OR conjuncao` | `condicao.val = Ou(condicao₁.val, conjuncao.val)` |
-| 24 | `conjuncao → fator` | `conjuncao.val = fator.val` |
-| 25 | `conjuncao → conjuncao AND fator` | `conjuncao.val = E(conjuncao₁.val, fator.val)` |
-| 26 | `fator → comparacao` | `fator.val = comparacao.val` |
-| 27 | `fator → EXISTS subconsulta` | `fator.val = Existe(subconsulta.val) (rejeitado na análise semântica)` |
-| 28 | `fator → LPAREN condicao RPAREN` | `fator.val = condicao.val (os parênteses só agrupam)` |
-| 29 | `fator → NOT fator` | `fator.val = Nao(fator₁.val)` |
-| 30 | `comparacao → operando NOT IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val, negado) (rejeitado na análise semântica)` |
-| 31 | `comparacao → operando IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val)` |
-| 32 | `comparacao → operando op_rel operando` | `comparacao.val = Comparacao(operando₁.val, op_rel.val, operando₂.val)` |
-| 33 | `op_rel → GE` | `op_rel.val = lexema do operador` |
-| 34 | `op_rel → LE` | `op_rel.val = lexema do operador` |
-| 35 | `op_rel → GT` | `op_rel.val = lexema do operador` |
-| 36 | `op_rel → LT` | `op_rel.val = lexema do operador` |
-| 37 | `op_rel → NE` | `op_rel.val = lexema do operador` |
-| 38 | `op_rel → EQ` | `op_rel.val = lexema do operador` |
-| 39 | `operando → subconsulta` | `operando.val = subconsulta.val` |
-| 40 | `operando → STRING` | `operando.val = Texto(STRING.lexema)` |
-| 41 | `operando → NUMBER` | `operando.val = Numero(NUMBER.lexema)` |
-| 42 | `operando → referencia` | `operando.val = referencia.val` |
-| 43 | `subconsulta → LPAREN selecao RPAREN` | `subconsulta.val = Subconsulta(selecao.val)` |
+| 19 | `tabela → subconsulta` | `tabela.val = TabelaDerivada(subconsulta.val, apelido=nulo) (rejeitado na análise semântica)` |
+| 20 | `tabela → subconsulta AS ID` | `tabela.val = TabelaDerivada(subconsulta.val, apelido=ID.lexema)` |
+| 21 | `tabela → subconsulta ID` | `tabela.val = TabelaDerivada(subconsulta.val, apelido=ID.lexema)` |
+| 22 | `tabela → ID AS ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
+| 23 | `tabela → ID ID` | `tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)` |
+| 24 | `tabela → ID` | `tabela.val = Tabela(ID.lexema)` |
+| 25 | `condicao → conjuncao` | `condicao.val = conjuncao.val` |
+| 26 | `condicao → condicao OR conjuncao` | `condicao.val = Ou(condicao₁.val, conjuncao.val)` |
+| 27 | `conjuncao → fator` | `conjuncao.val = fator.val` |
+| 28 | `conjuncao → conjuncao AND fator` | `conjuncao.val = E(conjuncao₁.val, fator.val)` |
+| 29 | `fator → comparacao` | `fator.val = comparacao.val` |
+| 30 | `fator → EXISTS subconsulta` | `fator.val = Existe(subconsulta.val) (rejeitado na análise semântica)` |
+| 31 | `fator → LPAREN condicao RPAREN` | `fator.val = condicao.val (os parênteses só agrupam)` |
+| 32 | `fator → NOT fator` | `fator.val = Nao(fator₁.val)` |
+| 33 | `comparacao → operando NOT IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val, negado) (rejeitado na análise semântica)` |
+| 34 | `comparacao → operando IN subconsulta` | `comparacao.val = Em(operando.val, subconsulta.val)` |
+| 35 | `comparacao → operando op_rel operando` | `comparacao.val = Comparacao(operando₁.val, op_rel.val, operando₂.val)` |
+| 36 | `op_rel → GE` | `op_rel.val = lexema do operador` |
+| 37 | `op_rel → LE` | `op_rel.val = lexema do operador` |
+| 38 | `op_rel → GT` | `op_rel.val = lexema do operador` |
+| 39 | `op_rel → LT` | `op_rel.val = lexema do operador` |
+| 40 | `op_rel → NE` | `op_rel.val = lexema do operador` |
+| 41 | `op_rel → EQ` | `op_rel.val = lexema do operador` |
+| 42 | `operando → subconsulta` | `operando.val = subconsulta.val` |
+| 43 | `operando → STRING` | `operando.val = Texto(STRING.lexema)` |
+| 44 | `operando → NUMBER` | `operando.val = Numero(NUMBER.lexema)` |
+| 45 | `operando → referencia` | `operando.val = referencia.val` |
+| 46 | `subconsulta → LPAREN selecao RPAREN` | `subconsulta.val = Subconsulta(selecao.val)` |
 
 Depois da análise, a AST passa pela análise semântica e é traduzida para a
 Álgebra Relacional pelas regras da seção 3.3. Na notação de tradução dirigida

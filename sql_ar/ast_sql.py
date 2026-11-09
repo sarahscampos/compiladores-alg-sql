@@ -127,7 +127,30 @@ class Join:
     condicao: Condicao
 
 
-ItemFrom = Union[Tabela, Join]
+@dataclass(frozen=True)
+class TabelaDerivada:
+    """( SELECT ... ) AS apelido, uma consulta usada como tabela no FROM."""
+    consulta: 'Consulta'
+    apelido: Optional[str]
+    linha: Optional[int] = field(default=None, compare=False)
+    indice: Optional[int] = field(default=None, compare=False)
+
+    # Não há tabela de origem com nome; só o apelido identifica o resultado
+    nome = None
+
+    @property
+    def nome_visivel(self):
+        return self.apelido
+
+    @property
+    def nomes_colunas(self):
+        """Colunas que a tabela derivada devolve (None quando é SELECT *)."""
+        if self.consulta.colunas is None:
+            return None
+        return [coluna.nome for coluna in self.consulta.colunas]
+
+
+ItemFrom = Union[Tabela, TabelaDerivada, Join]
 
 
 # --- Consulta ------------------------------------------------------------

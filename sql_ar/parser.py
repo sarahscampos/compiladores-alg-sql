@@ -12,7 +12,7 @@ produções e ações semânticas são [NOVO]. As marcas indicam o que mudou.
 from sly import Parser
 
 from .ast_sql import (Coluna, Comparacao, Consulta, E, Em, Existe, Join, Nao,
-                      Numero, Ou, Subconsulta, Tabela, Texto)
+                      Numero, Ou, Subconsulta, Tabela, TabelaDerivada, Texto)
 from .erros import ErroSintatico, calcular_coluna
 from .lexer import SqlLexer
 
@@ -250,6 +250,25 @@ class SqlParser(Parser):
         """tabela.val = Tabela(ID₁.lexema, apelido=ID₂.lexema)"""
         self._registrar(p)
         return Tabela(p.ID0, apelido=p.ID1, linha=p.lineno, indice=p.index)
+
+    # [AUTOINCORPORAÇÃO] Tabela derivada: uma consulta inteira no lugar de
+    # uma tabela, "FROM (SELECT ...) t". Reaproveita o não terminal
+    # subconsulta, o mesmo das subconsultas do WHERE.
+    @_('subconsulta ID', 'subconsulta AS ID')
+    def tabela(self, p):
+        """tabela.val = TabelaDerivada(subconsulta.val, apelido=ID.lexema)"""
+        self._registrar(p)
+        return TabelaDerivada(p.subconsulta.consulta, p.ID,
+                              linha=p.subconsulta.linha, indice=p.subconsulta.indice)
+
+    # Sem apelido: aceito pela gramática só para a análise semântica dar
+    # uma mensagem clara, porque a tradução precisa de um nome para o ρ.
+    @_('subconsulta')
+    def tabela(self, p):
+        """tabela.val = TabelaDerivada(subconsulta.val, apelido=nulo) (rejeitado na análise semântica)"""
+        self._registrar(p)
+        return TabelaDerivada(p.subconsulta.consulta, None,
+                              linha=p.subconsulta.linha, indice=p.subconsulta.indice)
 
     # ------------------------------------------------------------------
     # Condições: três níveis garantem OR < AND < NOT/parênteses

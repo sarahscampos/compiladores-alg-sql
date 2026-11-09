@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Testes das subconsultas (comparação e IN, não correlacionadas).
+"""Testes das subconsultas: no WHERE (comparação e IN) e no FROM (tabelas
+derivadas), não correlacionadas.
 
 Os testes de equivalência executam a mesma consulta no SQLite (biblioteca
 padrão do Python) e comparam o resultado com o das árvores de Álgebra
@@ -158,6 +159,77 @@ class TestesErros(unittest.TestCase):
         self.erro('SELECT x FROM a WHERE x IN (SELECT y FROM b', ErroSintatico)
 
 
+class TestesTabelaDerivada(unittest.TestCase):
+
+    def test_traducao(self):
+        self.assertEqual(
+            ar('SELECT t.nome FROM (SELECT nome, idade FROM alunos WHERE idade > 18) t '
+               'WHERE t.idade < 30;'),
+            'π_{t.nome}(σ_{t.idade < 30}(ρ_{t}(π_{nome, idade}(σ_{idade > 18}(alunos)))))')
+
+    def test_com_join(self):
+        self.assertEqual(
+            ar('SELECT t.nome FROM (SELECT id, nome FROM alunos) AS t '
+               'JOIN matriculas m ON t.id = m.aluno_id'),
+            'π_{t.nome}(ρ_{t}(π_{id, nome}(alunos)) ⋈_{t.id = m.aluno_id} ρ_{m}(matriculas))')
+
+    def test_aninhada_e_com_subconsulta_no_where(self):
+        self.assertEqual(
+            ar('SELECT nome FROM (SELECT * FROM alunos) s WHERE idade IN '
+               '(SELECT idade FROM (SELECT idade FROM alunos WHERE id < 5) u)'),
+            'π_{nome}(ρ_{s}(alunos) ⋉_{s.idade = sub1.idade} '
+            'ρ_{sub1}(π_{idade}(ρ_{u}(π_{idade}(σ_{id < 5}(alunos))))))')
+
+    def test_apelido_da_semijuncao_nao_colide(self):
+        self.assertEqual(
+            ar('SELECT * FROM (SELECT x FROM a WHERE x IN (SELECT y FROM sub1)) sub2'),
+            'ρ_{sub2}(π_{x}(a ⋉_{a.x = sub3.y} ρ_{sub3}(π_{y}(sub1))))')
+
+    def test_otimizacao(self):
+        self.assertEqual(
+            traduzir('SELECT t.nome, m.nota FROM (SELECT id, nome FROM alunos) t, matriculas m '
+                     'WHERE t.id = m.aluno_id AND m.nota > 7').texto_otimizado,
+            'π_{t.nome, m.nota}(π_{t.nome, t.id}(ρ_{t}(π_{id, nome}(alunos))) '
+            '⋈_{t.id = m.aluno_id} π_{m.nota, m.aluno_id}(σ_{m.nota > 7}(ρ_{m}(matriculas))))')
+
+    def test_derivacao(self):
+        derivacao = traduzir('SELECT t.x FROM (SELECT x FROM a) t').derivacao()
+        self.assertIn('[tabela → subconsulta t]', derivacao)
+        self.assertIn('[subconsulta → ( selecao )]', derivacao)
+
+    def erro(self, sql):
+        with self.assertRaises(ErroSemantico) as ctx:
+            traduzir(sql)
+        return ctx.exception.mensagem
+
+    def test_sem_apelido(self):
+        self.assertIn('apelido', self.erro('SELECT * FROM (SELECT x FROM a) WHERE x = 1'))
+
+    def test_coluna_inexistente(self):
+        self.assertIn("não devolve a coluna 'y'", self.erro('SELECT t.y FROM (SELECT x FROM a) t'))
+
+    def test_coluna_inexistente_no_where(self):
+        self.assertIn("não devolve a coluna 'k'",
+                      self.erro('SELECT t.x FROM (SELECT x FROM a) t WHERE t.k = 1'))
+
+    def test_estrela_com_varias_tabelas(self):
+        self.assertIn('liste as colunas', self.erro('SELECT * FROM (SELECT * FROM a, b) t'))
+
+    def test_colunas_repetidas(self):
+        self.assertIn("'id'", self.erro('SELECT * FROM (SELECT a.id, b.id FROM a, b) t'))
+
+    def test_correlacionada(self):
+        self.assertIn('correlacionadas',
+                      self.erro('SELECT * FROM b, (SELECT x FROM a WHERE a.k = b.k) t'))
+
+    def test_apelido_repetido(self):
+        self.assertIn('mais de uma vez',
+                      self.erro('SELECT * FROM (SELECT x FROM a) t, (SELECT y FROM b) t'))
+
+    def test_nome_original_nao_existe(self):
+        self.assertIn("'a'", self.erro('SELECT a.x FROM (SELECT x FROM a) t'))
+
+
 # --- Comparação com o SQLite ------------------------------------------------
 
 CONSULTAS_SQLITE = [
@@ -180,6 +252,15 @@ CONSULTAS_SQLITE = [
     'SELECT x FROM a WHERE id IN (SELECT a_id FROM b WHERE y IN (SELECT z FROM c WHERE z > 1))',
     'SELECT x FROM a WHERE k >= (SELECT k FROM a WHERE id = 1) AND id IN (SELECT a_id FROM b)',
     'SELECT x FROM a WHERE x > 1 AND id IN (SELECT a_id FROM b) AND k < 4',
+    # Subconsultas no FROM (tabelas derivadas)
+    'SELECT t.x FROM (SELECT x, k FROM a WHERE k > 1) t WHERE t.x < 3',
+    'SELECT t.x, b.y FROM (SELECT id, x FROM a WHERE x > 1) AS t JOIN b ON t.id = b.a_id',
+    'SELECT * FROM (SELECT * FROM a WHERE k > 2) t',
+    'SELECT y FROM (SELECT y, a_id FROM b) t, a WHERE t.a_id = a.id AND a.x > 1',
+    'SELECT u.z FROM (SELECT z FROM (SELECT z, b_id FROM c WHERE z > 1) v) u',
+    'SELECT x FROM (SELECT x, id FROM a) t WHERE id IN (SELECT a_id FROM b)',
+    'SELECT t.x FROM (SELECT x FROM a WHERE id IN (SELECT a_id FROM b)) t',
+    'SELECT p.x FROM (SELECT id, x FROM a) p, (SELECT id, k FROM a) q WHERE p.id = q.k',
     # Consultas sem subconsulta também são conferidas
     'SELECT a.x, b.y FROM a, b WHERE a.id = b.a_id AND (a.x > 1 OR b.y < 2)',
     'SELECT x FROM a WHERE NOT (x = 1 OR k = 2)',
@@ -239,6 +320,8 @@ class TestesSqlite(unittest.TestCase):
                     nao_vazios += bool(esperado)
         # Garante que os dados de fato exercitam as consultas
         self.assertGreater(nao_vazios, len(CONSULTAS_SQLITE) * 8)
+        # Garante que a lista continua cobrindo as tabelas derivadas
+        self.assertTrue(any(') t' in sql for sql in CONSULTAS_SQLITE))
 
     def test_traducao_usa_semijuncao(self):
         expressao = traduzir(CONSULTAS_SQLITE[0]).expressao

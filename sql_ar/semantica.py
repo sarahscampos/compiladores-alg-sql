@@ -7,8 +7,8 @@ Sem um catálogo (esquema do banco) não é possível saber quais colunas cada
 tabela possui; por isso as verificações se limitam ao que a própria consulta
 declara na cláusula FROM.
 """
-from .ast_sql import (Coluna, Comparacao, E, Em, Existe, Nao, Ou, Subconsulta,
-                      Tabela, separar_conjuncoes)
+from .ast_sql import (Coluna, Comparacao, E, Em, Existe, Join, Nao, Ou, Subconsulta,
+                      Tabela, TabelaDerivada, separar_conjuncoes)
 from .erros import ErroSemantico, calcular_coluna
 
 
@@ -32,7 +32,9 @@ def _declarar_item(item, escopo, texto, externos):
     Em SQL, a condição ON só enxerga as tabelas já unidas até aquele ponto,
     então ela é verificada logo após declarar o lado direito do JOIN.
     """
-    if isinstance(item, Tabela):
+    if isinstance(item, TabelaDerivada):
+        _verificar_tabela_derivada(item, escopo, texto, externos)
+    if isinstance(item, (Tabela, TabelaDerivada)):
         _declarar_tabela(item, escopo, texto)
         return {item.nome_visivel: item}
     locais = _declarar_item(item.esquerda, escopo, texto, externos)
@@ -48,11 +50,40 @@ def _declarar_item(item, escopo, texto, externos):
 def _declarar_tabela(tabela, escopo, texto):
     nome = tabela.nome_visivel
     if nome in escopo:
+        exemplo = (f'(ex.: {tabela.nome} t1, {tabela.nome} t2)' if tabela.nome
+                   else '(ex.: (SELECT ...) t2)')
         raise ErroSemantico(
             f"a tabela '{nome}' aparece mais de uma vez no FROM; "
-            f"use apelidos diferentes (ex.: {tabela.nome} t1, {tabela.nome} t2)",
-            *_posicao(tabela, texto))
+            f"use apelidos diferentes {exemplo}", *_posicao(tabela, texto))
     escopo[nome] = tabela
+
+
+def _verificar_tabela_derivada(tabela, escopo, texto, externos):
+    """FROM (SELECT ...) apelido"""
+    if tabela.apelido is None:
+        raise ErroSemantico('uma subconsulta no FROM precisa de um apelido, por exemplo '
+                            '(SELECT ...) AS t; ele é o nome da relação na renomeação ρ',
+                            *_posicao(tabela, texto))
+    interna = tabela.consulta
+    # Sem LATERAL, a subconsulta do FROM não enxerga as outras tabelas do
+    # FROM nem as consultas de fora: referências a elas são correlação.
+    analisar(interna, texto, externos + (escopo,))
+
+    nomes = tabela.nomes_colunas
+    if nomes is None:
+        varias_tabelas = len(interna.origem) > 1 or isinstance(interna.origem[0], Join)
+        if varias_tabelas:
+            raise ErroSemantico(
+                'SELECT * numa subconsulta do FROM com mais de uma tabela não é suportado: '
+                'sem o esquema não dá para saber se há colunas com o mesmo nome; '
+                'liste as colunas', *_posicao(tabela, texto))
+        return
+    repetidas = sorted({n for n in nomes if nomes.count(n) > 1})
+    if repetidas:
+        raise ErroSemantico(
+            f"a subconsulta '{tabela.apelido}' devolve mais de uma coluna chamada "
+            f"'{repetidas[0]}'; depois da renomeação ρ_{{{tabela.apelido}}} elas teriam o "
+            "mesmo nome", *_posicao(tabela, texto))
 
 
 # --- Subconsultas -----------------------------------------------------------
@@ -150,7 +181,16 @@ def _verificar_condicao(condicao, escopo, texto, externos):
 
 
 def _verificar_coluna(coluna, escopo, texto, externos):
-    if coluna.tabela is None or coluna.tabela in escopo:
+    if coluna.tabela is None:
+        return
+    if coluna.tabela in escopo:
+        # Numa tabela derivada as colunas são conhecidas mesmo sem esquema
+        origem = escopo[coluna.tabela]
+        nomes = origem.nomes_colunas if isinstance(origem, TabelaDerivada) else None
+        if nomes is not None and coluna.nome not in nomes:
+            raise ErroSemantico(
+                f"a subconsulta '{coluna.tabela}' não devolve a coluna '{coluna.nome}' "
+                f"(devolve: {', '.join(origem.nomes_colunas)})", *_posicao(coluna, texto))
         return
     if any(coluna.tabela in externo for externo in externos):
         raise ErroSemantico(
